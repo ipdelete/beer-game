@@ -9,7 +9,9 @@ def export_simulation_results(state: GameState, filename: str):
     Format: Turn, Role, Inventory, Backlog, Order, ShipmentReceived, TotalCost
     """
     # Ensure directory exists
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    dirname = os.path.dirname(filename)
+    if dirname:
+        os.makedirs(dirname, exist_ok=True)
     
     with open(filename, mode='w', newline='') as f:
         writer = csv.writer(f)
