@@ -14,7 +14,7 @@ To compare the rule-based (mechanistic) approach with the Generative Agent-Based
 
 1. **Run Mechanistic Simulation:**
    ```bash
-   uv run src/main.py --mode mechanistic --output results_mech.csv
+   export PYTHONPATH=$PYTHONPATH:. && uv run src/main.py --mode mechanistic --output results_mech.csv
    ```
 
 2. **Run GABM Simulation** (ensure Ollama is running):

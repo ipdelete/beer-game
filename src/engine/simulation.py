@@ -1,129 +1,273 @@
-from typing import List, Dict, Callable
-from .state import GameState, PositionState
+"""Beer Game orchestration engine.
+
+Owns four `BaseRole` instances (Retailer, Wholesaler, Distributor, Factory),
+runs the canonical Sterman two-phase week, and routes shipments between roles.
+The per-week logic is:
+
+    1. Snapshot `slots[0]` on every delay pipeline (arrivals this week)
+    2. For each role, build a `PlayerView` from that snapshot
+    3. Call the pluggable `decision_fn(PlayerView)` for all 4 roles
+    4. Execute each role's `execute_week(...)` with its decision
+    5. Wire Factory output into Distributor's incoming shipping delay,
+       Distributor -> Wholesaler, Wholesaler -> Retailer
+    6. Append a `PlayerRecord` to each role's history
+
+The decision function is pure: `(PlayerView) -> int`. It has no access to
+anything a real player couldn't see.
+"""
+
+from typing import Callable, Dict, List
+
+import sys
+from pathlib import Path
+
+# Make sibling `roles` package importable when engine is imported as `src.engine`
+_repo_src = Path(__file__).resolve().parent.parent
+if str(_repo_src) not in sys.path:
+    sys.path.insert(0, str(_repo_src))
+
+from roles import Retailer, Wholesaler, Distributor, Factory  # noqa: E402
+
+from .state import PlayerRecord, PlayerView  # noqa: E402
 
 
-class DelayQueue:
-    """A FIFO delay queue for items arriving after a number of turns."""
-
-    def __init__(self, delay: int = 2):
-        self.delay = delay
-        self.queue: List[dict] = []
-
-    def enqueue(self, turn: int, amount: int) -> None:
-        self.queue.append({"arrival_turn": turn + self.delay, "amount": amount})
-        self.queue.sort(key=lambda x: x["arrival_turn"])
-
-    def dequeue(self, turn: int) -> int:
-        total = 0
-        remaining: List[dict] = []
-        for item in self.queue:
-            if item["arrival_turn"] == turn:
-                total += int(item["amount"])
-            else:
-                remaining.append(item)
-        self.queue = remaining
-        return total
+DecisionFn = Callable[[PlayerView], int]
 
 
-class BeerGameSimulation:
+class BeerGameEngine:
+    """Orchestrates a classic Beer Game using pluggable decision functions."""
+
     def __init__(
         self,
-        state: GameState,
-        decision_fn: Callable[[str, PositionState, int, int, int], int],
+        decision_fn: DecisionFn,
+        team_name: str = "Beer Game",
     ):
-        """Initialize simulation.
-
-        Args:
-            state: The GameState to operate on.
-            decision_fn: Called with (role, state, customer_demand, turn, incoming_order).
-        """
-        self.state = state
+        self.team_name = team_name
         self.decision_fn = decision_fn
-        self.order_delay: Dict[str, DelayQueue] = {
-            "Wholesaler": DelayQueue(1),
-            "Distributor": DelayQueue(1),
-            "Factory": DelayQueue(1),
+
+        self.retailer = Retailer(team_name)
+        self.wholesaler = Wholesaler(team_name)
+        self.distributor = Distributor(team_name)
+        self.factory = Factory(team_name)
+
+        self.current_week = 0
+        self.history: Dict[str, List[PlayerRecord]] = {
+            "Retailer": [],
+            "Wholesaler": [],
+            "Distributor": [],
+            "Factory": [],
         }
-        self.shipping_delay: Dict[str, DelayQueue] = {
-            "Retailer": DelayQueue(1),
-            "Wholesaler": DelayQueue(1),
-            "Distributor": DelayQueue(1),
-            "Factory": DelayQueue(1),
-        }
-        self.flow_map: Dict[str, str] = {
-            "Retailer": "Wholesaler",
-            "Wholesaler": "Distributor",
-            "Distributor": "Factory",
+        self.order_history: Dict[str, List[int]] = {
+            "Customer": [],
+            "Retailer": [],
+            "Wholesaler": [],
+            "Distributor": [],
+            "Factory": [],
         }
 
-    def _ship_amount(self, upstream_pos: PositionState, order_amount: int) -> int:
-        """Ship as much as possible from upstream_pos; return actual shipped."""
-        to_fill = order_amount + upstream_pos.backlog
-        if upstream_pos.inventory >= to_fill:
-            shipped = to_fill
-            upstream_pos.inventory -= shipped
-            upstream_pos.backlog = 0
-        else:
-            shipped = upstream_pos.inventory
-            upstream_pos.backlog = to_fill - shipped
-            upstream_pos.inventory = 0
-        return shipped
+    # ── helpers ────────────────────────────────────────────────────────────
 
-    def run_turn(self) -> Dict[str, int]:
-        self.state.current_turn += 1
-        turn = self.state.current_turn
+    @staticmethod
+    def _slot0(pipeline) -> int:
+        if pipeline is None:
+            return 0
+        slots = pipeline.slots
+        return slots[0] if slots else 0
 
-        if turn == 5:
-            self.state.customer_demand = 8
+    def _on_order(self, role) -> int:
+        """Total units already ordered but not yet in inventory.
 
-        orders_placed: Dict[str, int] = {}
-        shipment_received_map: Dict[str, int] = {}
+        For retailer/wholesaler/distributor, that's orders in the upstream
+        order-delay PLUS shipments in the incoming shipping-delay. For the
+        factory it's just production in the production pipeline.
+        """
+        if role is self.factory:
+            return self.factory.production_delay.get_total()
+        order_pipeline_total = (
+            role.outgoing_order_delay.get_total() if role.outgoing_order_delay else 0
+        )
+        return order_pipeline_total + role.incoming_shipping_delay.get_total()
 
-        role_order = ["Retailer", "Wholesaler", "Distributor", "Factory"]
+    def _build_view(
+        self,
+        role,
+        role_name: str,
+        week: int,
+        incoming_order: int,
+        shipment_arriving: int,
+    ) -> PlayerView:
+        return PlayerView(
+            role=role_name,
+            week=week,
+            inventory=role.inventory,
+            backlog=role.backlog,
+            incoming_order=incoming_order,
+            shipment_received=shipment_arriving,
+            last_order_placed=role.last_order_placed,
+            on_order=self._on_order(role),
+            history=list(self.history[role_name]),
+        )
 
-        # Step 1: Collect order decisions
-        for role in role_order:
-            pos = self.state.positions[role]
+    # ── main loop ──────────────────────────────────────────────────────────
 
-            # Receive shipments arriving this turn
-            sr = self.shipping_delay[role].dequeue(turn)
-            shipment_received_map[role] = sr
-            pos.inventory += sr
+    def simulate_week(self) -> None:
+        self.current_week += 1
+        week = self.current_week
 
-            # Determine incoming order from downstream
-            if role == "Retailer":
-                incoming_order = self.state.customer_demand
-            else:
-                idx = role_order.index(role)
-                downstream = role_order[idx - 1]
-                incoming_order = orders_placed[downstream]
+        # Phase 1: snapshot what arrives this week from each pipeline.
+        # Orders arriving at each upstream role from their downstream partner:
+        retailer_out_order_arriving = self._slot0(self.retailer.outgoing_order_delay)
+        wholesaler_out_order_arriving = self._slot0(
+            self.wholesaler.outgoing_order_delay
+        )
+        distributor_out_order_arriving = self._slot0(
+            self.distributor.outgoing_order_delay
+        )
+        # Beer shipments arriving at each role this week:
+        retailer_beer_arriving = self._slot0(self.retailer.incoming_shipping_delay)
+        wholesaler_beer_arriving = self._slot0(self.wholesaler.incoming_shipping_delay)
+        distributor_beer_arriving = self._slot0(
+            self.distributor.incoming_shipping_delay
+        )
+        factory_beer_arriving = self._slot0(self.factory.production_delay)
 
-            # Get order decision from agent
-            customer_demand = self.state.customer_demand if role == "Retailer" else 0
-            order = self.decision_fn(role, pos, customer_demand, turn, incoming_order)
-            order = max(0, order)
-            orders_placed[role] = order
+        customer_order = self.retailer.get_customer_order(week)
 
-        # Step 2: Fulfill orders, compute costs, record history
-        for role in role_order:
-            pos = self.state.positions[role]
+        # Phase 2: build views + decisions from that snapshot.
+        # Incoming orders per role *as they will be processed this week*:
+        #   - Retailer fills customer_order directly (from outside the chain)
+        #   - Wholesaler sees retailer's order that is *arriving* now
+        #   - Distributor sees wholesaler's order that is arriving now
+        #   - Factory sees distributor's order that is arriving now
+        retailer_view = self._build_view(
+            self.retailer,
+            "Retailer",
+            week,
+            incoming_order=customer_order,
+            shipment_arriving=retailer_beer_arriving,
+        )
+        wholesaler_view = self._build_view(
+            self.wholesaler,
+            "Wholesaler",
+            week,
+            incoming_order=retailer_out_order_arriving,
+            shipment_arriving=wholesaler_beer_arriving,
+        )
+        distributor_view = self._build_view(
+            self.distributor,
+            "Distributor",
+            week,
+            incoming_order=wholesaler_out_order_arriving,
+            shipment_arriving=distributor_beer_arriving,
+        )
+        factory_view = self._build_view(
+            self.factory,
+            "Factory",
+            week,
+            incoming_order=distributor_out_order_arriving,
+            shipment_arriving=factory_beer_arriving,
+        )
 
-            if role == "Retailer":
-                incoming_order = self.state.customer_demand
-            else:
-                idx = role_order.index(role)
-                downstream = role_order[idx - 1]
-                incoming_order = orders_placed[downstream]
+        retailer_decision = max(0, int(self.decision_fn(retailer_view)))
+        wholesaler_decision = max(0, int(self.decision_fn(wholesaler_view)))
+        distributor_decision = max(0, int(self.decision_fn(distributor_view)))
+        factory_decision = max(0, int(self.decision_fn(factory_view)))
 
-            self._ship_amount(pos, incoming_order)
-            pos.total_cost += (pos.inventory * 0.50) + (pos.backlog * 1.00)
-            pos.update_history(turn, orders_placed[role], shipment_received_map[role])
+        # Phase 3: execute all roles (advances delays, updates inventory/backlog).
+        self.retailer.execute_week(order_decision=retailer_decision)
+        wholesaler_shipped = self.wholesaler.execute_week(
+            incoming_order=retailer_out_order_arriving,
+            order_decision=wholesaler_decision,
+        )
+        distributor_shipped = self.distributor.execute_week(
+            incoming_order=wholesaler_out_order_arriving,
+            order_decision=distributor_decision,
+        )
+        factory_shipped = self.factory.execute_week(
+            incoming_order=distributor_out_order_arriving,
+            production_decision=factory_decision,
+        )
 
-        # Step 3: Ship orders upstream (with delay)
-        for downstream, upstream in self.flow_map.items():
-            self.order_delay[upstream].enqueue(turn, orders_placed[downstream])
+        # Phase 4: wire shipments into downstream shipping delays.
+        if wholesaler_shipped > 0:
+            self.retailer.incoming_shipping_delay.add_input(wholesaler_shipped)
+        if distributor_shipped > 0:
+            self.wholesaler.incoming_shipping_delay.add_input(distributor_shipped)
+        if factory_shipped > 0:
+            self.distributor.incoming_shipping_delay.add_input(factory_shipped)
 
-        # Step 4: Ship production from Factory
-        self.shipping_delay["Factory"].enqueue(turn, orders_placed["Factory"])
+        # Phase 5: append PlayerRecord rows for history and exporter.
+        self._record(
+            "Retailer",
+            week,
+            self.retailer,
+            customer_order,
+            retailer_beer_arriving,
+            retailer_decision,
+        )
+        self._record(
+            "Wholesaler",
+            week,
+            self.wholesaler,
+            retailer_out_order_arriving,
+            wholesaler_beer_arriving,
+            wholesaler_decision,
+        )
+        self._record(
+            "Distributor",
+            week,
+            self.distributor,
+            wholesaler_out_order_arriving,
+            distributor_beer_arriving,
+            distributor_decision,
+        )
+        self._record(
+            "Factory",
+            week,
+            self.factory,
+            distributor_out_order_arriving,
+            factory_beer_arriving,
+            factory_decision,
+        )
 
-        return orders_placed
+        # Track flat order history (compat with legacy analysis tooling).
+        self.order_history["Customer"].append(customer_order)
+        self.order_history["Retailer"].append(retailer_decision)
+        self.order_history["Wholesaler"].append(wholesaler_decision)
+        self.order_history["Distributor"].append(distributor_decision)
+        self.order_history["Factory"].append(factory_decision)
+
+    def _record(
+        self,
+        role_name: str,
+        week: int,
+        role,
+        incoming_order: int,
+        shipment_received: int,
+        order_placed: int,
+    ) -> None:
+        cost = role.get_current_cost()
+        record = PlayerRecord(
+            week=week,
+            inventory=role.inventory,
+            backlog=role.backlog,
+            incoming_order=incoming_order,
+            shipment_received=shipment_received,
+            order_placed=order_placed,
+            on_order=self._on_order(role),
+            cost=cost,
+        )
+        self.history[role_name].append(record)
+
+    # ── convenience ────────────────────────────────────────────────────────
+
+    def get_total_costs(self) -> Dict[str, float]:
+        return {
+            name: role.get_total_cost()
+            for name, role in (
+                ("Retailer", self.retailer),
+                ("Wholesaler", self.wholesaler),
+                ("Distributor", self.distributor),
+                ("Factory", self.factory),
+            )
+        }

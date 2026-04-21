@@ -1,38 +1,43 @@
+"""State structures exposed to decision functions.
+
+Defines the player-visible state the engine passes to a decision function each
+week. These are strict "what a human player sees" snapshots, so a decision
+function cannot peek at upstream/downstream private state.
+"""
+
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import List
 
 
 @dataclass
-class PositionState:
-    name: str
-    inventory: int = 0
-    backlog: int = 0
-    incoming_shipments: List[Dict] = field(
-        default_factory=list
-    )  # List of {'arrival_turn': int, 'amount': int}
-    total_cost: float = 0.0
-    history: List[Dict] = field(default_factory=list)
+class PlayerRecord:
+    """A single-week record of everything a player observes.
 
-    def update_history(self, turn: int, order: int, shipment_received: int):
-        self.history.append(
-            {
-                "turn": turn,
-                "inventory": self.inventory,
-                "backlog": self.backlog,
-                "order": order,
-                "shipment_received": shipment_received,
-                "cost": self.total_cost,
-            }
-        )
+    Extends the classic `WeeklyRecord` with `incoming_order`, `shipment_received`,
+    and `on_order` so a decision function (or GABM prompt) has enough context to
+    reason about in-flight orders and avoid the phantom-ordering bullwhip trap.
+    """
+
+    week: int
+    inventory: int
+    backlog: int
+    incoming_order: int
+    shipment_received: int
+    order_placed: int
+    on_order: int
+    cost: float
 
 
 @dataclass
-class GameState:
-    positions: Dict[str, PositionState] = field(default_factory=dict)  # type: ignore[assignment]
-    current_turn: int = 0
-    customer_demand: int = 4
+class PlayerView:
+    """What a decision function sees for one role on one turn."""
 
-    def __post_init__(self):
-        # Initialize the 4 standard roles (override any passed positions)
-        roles = ["Retailer", "Wholesaler", "Distributor", "Factory"]
-        self.positions = {role: PositionState(name=role) for role in roles}
+    role: str
+    week: int
+    inventory: int
+    backlog: int
+    incoming_order: int
+    shipment_received: int
+    last_order_placed: int
+    on_order: int
+    history: List[PlayerRecord] = field(default_factory=list)
