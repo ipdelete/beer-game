@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Dict
 from openai import OpenAI
 from ..engine.state import PositionState
@@ -7,13 +8,14 @@ from ..engine.state import PositionState
 DEFAULT_ENDPOINT = "http://localhost:11434/v1"
 DEFAULT_MODEL = "mistral:latest"
 
+
 class GABMAgent:
     def __init__(self, role: str):
         self.role = role
         self.endpoint = os.getenv("LLM_ENDPOINT", DEFAULT_ENDPOINT)
         self.model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
         self.client = OpenAI(base_url=self.endpoint, api_key="ollama")
-        
+
         self.system_prompt = self._get_system_prompt()
 
     def _get_system_prompt(self) -> str:
@@ -49,7 +51,13 @@ class GABMAgent:
         }
         return prompts.get(self.role, "You are a supply chain manager.")
 
-    def decide_order(self, state: PositionState, turn: int, customer_demand: int = 0) -> int:
+    def decide_order(
+        self,
+        state: PositionState,
+        turn: int,
+        customer_demand: int = 0,
+        incoming_order: int = 0,
+    ) -> int:
         # Prepare the prompt with current state
         prompt = (
             f"Turn: {turn}\n"
@@ -59,7 +67,9 @@ class GABMAgent:
         )
         if self.role == "Retailer":
             prompt += f"Current Customer Demand: {customer_demand}\n"
-        
+        else:
+            prompt += f"Incoming Orders from Downstream: {incoming_order}\n"
+
         prompt += "\nHow many cases should you order? Provide ONLY the number as your response."
 
         try:
@@ -67,30 +77,39 @@ class GABMAgent:
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
-                temperature=0.7
+                temperature=0.7,
             )
             # Extract number from response
             content = response.choices[0].message.content.strip()
-            # Attempt to find the first integer in the response
-            import re
-            match = re.search(r'\d+', content)
+            match = re.search(r"\d+", content)
             if match:
-                return int(match.group())
+                order = int(match.group())
+                return max(0, order)  # Clamp to non-negative
             return 0
         except Exception as e:
             print(f"Error getting decision for {self.role}: {e}")
             return 0
 
-def gabm_decision(role: str, pos: PositionState, customer_demand: int, turn: int = 0) -> int:
+
+def gabm_decision(
+    role: str,
+    pos: PositionState,
+    customer_demand: int,
+    turn: int = 0,
+    incoming_order: int = 0,
+) -> int:
     """
     Wrapper function to make GABM compatible with the simulation engine.
-    Note: The current simulation.py doesn't pass 'turn', so we'll need to update it.
     """
-    # To avoid creating a new agent every turn, we should cache them.
+    # To avoid creating a new agent every turn, we cache them.
     if not hasattr(gabm_decision, "_agents"):
-        gabm_decision._agents = {role: GABMAgent(role) for role in ['Retailer', 'Wholesaler', 'Distributor', 'Factory']}
-    
-    # We'll use a default turn for now since the engine doesnt provide it
-    return gabm_decision._agents[role].decide_order(pos, turn, customer_demand)
+        gabm_decision._agents = {
+            r: GABMAgent(r)
+            for r in ["Retailer", "Wholesaler", "Distributor", "Factory"]
+        }
+
+    return gabm_decision._agents[role].decide_order(
+        pos, turn, customer_demand, incoming_order
+    )

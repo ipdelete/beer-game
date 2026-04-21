@@ -6,17 +6,28 @@ from src.mechanistic.agent import mechanistic_decision
 from src.gabm.agent import gabm_decision
 from src.engine.exporter import export_simulation_results
 
+
 def main():
     parser = argparse.ArgumentParser(description="Beer Game Simulation")
-    parser.add_argument("--mode", choices=["mechanistic", "gabm"], default="mechanistic", help="Simulation mode")
+    parser.add_argument(
+        "--mode",
+        choices=["mechanistic", "gabm"],
+        default="mechanistic",
+        help="Simulation mode",
+    )
     parser.add_argument("--turns", type=int, default=30, help="Number of turns to run")
-    parser.add_argument("--output", type=str, default=None, help="Filename to export results to (e.g. results.csv)")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Filename to export results to (e.g. results.csv)",
+    )
     args = parser.parse_args()
 
     print(f"Starting Beer Game in {args.mode} mode for {args.turns} turns...")
 
-    state = GameState(positions={}) # Initialized in __post_init__
-    
+    state = GameState()
+
     # Select decision function based on mode
     if args.mode == "mechanistic":
         decision_fn = mechanistic_decision
@@ -40,8 +51,6 @@ def main():
         export_simulation_results(state, args.output)
         print(f"\nResults exported to {args.output}")
 
+
 if __name__ == "__main__":
     main()
-
-
-
