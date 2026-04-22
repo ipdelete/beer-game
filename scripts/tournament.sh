@@ -60,7 +60,8 @@ for MODEL in "${MODELS[@]}"; do
     W=$(grep -E "^\s*Wholesaler:"  "$LOG" | awk -F'\\$' '{print $2}' | tr -d ' ')
     D=$(grep -E "^\s*Distributor:" "$LOG" | awk -F'\\$' '{print $2}' | tr -d ' ')
     F=$(grep -E "^\s*Factory:"     "$LOG" | awk -F'\\$' '{print $2}' | tr -d ' ')
-    TOTAL=$(python3 -c "print(round(sum(float(x) for x in ['${R:-0}','${W:-0}','${D:-0}','${F:-0}']), 2))")
+    TOTAL=$(awk -v r="${R:-0}" -v w="${W:-0}" -v d="${D:-0}" -v f="${F:-0}" \
+      'BEGIN { printf "%.2f", r + w + d + f }')
     printf "%s\t%d\t%s\t%s\t%s\t%s\t%s\n" \
       "$MODEL" "$ELAPSED" "$TOTAL" "${R:-NA}" "${W:-NA}" "${D:-NA}" "${F:-NA}" >> "$SUMMARY"
   else

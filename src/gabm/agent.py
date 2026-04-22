@@ -110,17 +110,30 @@ class GABMAgent:
             )
             msg = response.choices[0].message
             content = (msg.content or "").strip()
-            # Reasoning models (e.g. gpt-oss) sometimes return their final answer
-            # in `reasoning` rather than `content`; fall back to that if empty.
-            if not content:
-                reasoning = getattr(msg, "reasoning", None) or ""
-                content = reasoning.strip()
-            # Use the LAST integer in the response. Reasoning chains often cite
-            # earlier numbers (incoming order, inventory, etc.); the final
-            # committed number is almost always at the end.
-            matches = re.findall(r"-?\d+", content)
-            if matches:
-                return max(0, int(matches[-1]))
+            reasoning = (getattr(msg, "reasoning", None) or "").strip()
+
+            # Strategy: isolate the model's *final* answer, which is whatever
+            # comes after any explicit reasoning.
+            #   1. Reasoning-field models (gpt-oss): content IS the answer.
+            #   2. Inline <think>...</think> models (qwen3, gemma4): use text
+            #      after the last </think>.
+            #   3. Plain models (mistral, phi4): the answer is typically the
+            #      FIRST integer in the response; later numbers are just
+            #      justification (e.g. "Order 4 because inventory is 12").
+            if content:
+                if "</think>" in content:
+                    answer_region = content.rsplit("</think>", 1)[-1]
+                    matches = re.findall(r"-?\d+", answer_region)
+                    if matches:
+                        return max(0, int(matches[0]))
+                matches = re.findall(r"-?\d+", content)
+                if matches:
+                    return max(0, int(matches[0]))
+            # Fallback: reasoning field only (e.g. gpt-oss with empty content).
+            if reasoning:
+                matches = re.findall(r"-?\d+", reasoning)
+                if matches:
+                    return max(0, int(matches[-1]))
             return 0
         except Exception as e:  # pragma: no cover - network error path
             print(f"[GABM:{self.role}] decision error: {e}; defaulting to 0")
