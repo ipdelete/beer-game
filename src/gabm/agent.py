@@ -105,10 +105,23 @@ class GABMAgent:
                     {"role": "user", "content": _user_prompt(view)},
                 ],
                 temperature=0.4,
+                max_tokens=256,
+                timeout=60,
             )
-            content = (response.choices[0].message.content or "").strip()
-            match = re.search(r"\d+", content)
-            return max(0, int(match.group())) if match else 0
+            msg = response.choices[0].message
+            content = (msg.content or "").strip()
+            # Reasoning models (e.g. gpt-oss) sometimes return their final answer
+            # in `reasoning` rather than `content`; fall back to that if empty.
+            if not content:
+                reasoning = getattr(msg, "reasoning", None) or ""
+                content = reasoning.strip()
+            # Use the LAST integer in the response. Reasoning chains often cite
+            # earlier numbers (incoming order, inventory, etc.); the final
+            # committed number is almost always at the end.
+            matches = re.findall(r"-?\d+", content)
+            if matches:
+                return max(0, int(matches[-1]))
+            return 0
         except Exception as e:  # pragma: no cover - network error path
             print(f"[GABM:{self.role}] decision error: {e}; defaulting to 0")
             return 0
