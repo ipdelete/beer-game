@@ -344,3 +344,74 @@ agentic framework underneath"*. That's not the case here. The
 calls, each given a role-specific prompt and a history table, with
 no agent-to-agent coordination at all. Any credit accrues to the
 model weights and the prompt, in that order.
+
+## Appendix C — Non-Ollama reference run: DeepSeek V4 Flash on ds4
+
+After the main 5-model Ollama tournament, we ran the same GABM
+harness against **DeepSeek V4 Flash** served by
+[`antirez/ds4`](https://github.com/antirez/ds4) (`ds4-server`,
+Metal, q4-imatrix, ~153 GB on disk) on the same Mac Studio. This
+is a *reference data point*, not a leaderboard entry: the runtime,
+model class, and KV-cache strategy are all different from the
+Ollama cohort.
+
+### Result
+
+| Model | Runtime | Wall (s) | **Total** | Retailer | Wholesaler | Distributor | Factory |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `deepseek-v4-flash` (q4-imatrix) | `ds4-server` (Metal) | 1,360 | **$2,789.50** | 883.50 | 1,120.00 | 570.00 | 216.00 |
+
+For comparison, the leader of the Ollama roster (`gpt-oss:20b`)
+totalled **$2,585**, and the Sterman mechanistic baseline is
+**$3,128**. ds4-served DeepSeek V4 Flash also beats Sterman, and
+lands within ~8 % of `gpt-oss:20b` on game cost.
+
+### Why we report it separately
+
+- **Different inference engine.** `ds4-server` is a single-purpose
+  native engine for DeepSeek V4 Flash, with a Metal graph executor
+  and a single mutable KV checkpoint. Ollama uses `llama.cpp`
+  under the hood with a generic loader and per-request KV.
+- **Different model class.** The Ollama cohort is intentionally a
+  4–13 GB "similar-class" lineup. DeepSeek V4 Flash is a 284 B
+  parameter MoE; the q4-imatrix file alone is ~153 GB on disk.
+- **Structural KV-cache advantage on this workload.** The GABM
+  beer-game prompt is a stable system prompt + a per-role
+  transcript that grows by one row per week. ds4-server is
+  designed to share the longest matching prefix across requests
+  and reuse the live KV checkpoint, so most of each per-week call
+  reuses prefill from the previous call. Ollama's per-request KV
+  does not exploit this. Wall-time is therefore *not* directly
+  comparable; per-decode latency at steady state is the more
+  honest metric, which we did not isolate in this run.
+- **Thinking mode left on (ds4 default).** The existing GABM
+  parser strips `</think>` blocks and the OpenAI `reasoning`
+  field, so integer extraction worked unchanged.
+
+### Reproducing it
+
+```bash
+# In a separate terminal, start ds4-server (after building ds4 and
+# downloading the q4-imatrix weights — see ds4's README):
+~/src/ds4/ds4-server --ctx 32768 --port 8000 \
+  --kv-disk-dir /tmp/ds4-kv --kv-disk-space-mb 8192
+
+# Then, from the beer-game repo:
+LLM_ENDPOINT=http://localhost:8000/v1 MODELS=deepseek-v4-flash \
+  uv run scripts/preflight.py
+./scripts/tournament-ds4.sh
+```
+
+### What this tells us
+
+DeepSeek V4 Flash, on its own purpose-built engine, lands in the
+same ballpark as the best general-purpose Ollama-served model on
+this workload. That's a useful *upper-edge* sanity check on the
+benchmark itself: the leaderboard isn't accidentally rewarding a
+single architecture or runtime, and there is real signal at the
+top of the table — bigger / more recent models do measurably
+better, but the gap is single-digit percentage points, not
+order-of-magnitude. The interesting open question for future work
+is whether the gap is the model, the prompt, or the prefix-reuse —
+each of which is independently testable.
+
