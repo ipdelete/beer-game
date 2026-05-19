@@ -12,10 +12,11 @@ import os
 import re
 from typing import Dict, List
 
+from opentelemetry.trace import SpanKind, Status, StatusCode
 from openai import OpenAI
 
+from ..bench import telemetry
 from ..engine.state import PlayerRecord, PlayerView
-
 
 DEFAULT_ENDPOINT = "http://localhost:11434/v1"
 DEFAULT_MODEL = "mistral:latest"
@@ -39,9 +40,7 @@ def _system_prompt(role: str) -> str:
     upstream = _UPSTREAM[role]
     downstream = _DOWNSTREAM[role]
     target_text = (
-        f"place an order to the {upstream}"
-        if upstream
-        else "set a production quantity"
+        f"place an order to the {upstream}" if upstream else "set a production quantity"
     )
     return (
         f"You are the {role} in a 4-tier beer distribution supply chain. "
@@ -97,47 +96,153 @@ class GABMAgent:
         self.system_prompt = _system_prompt(role)
 
     def decide(self, view: PlayerView) -> int:
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
+        tracer = telemetry.get_tracer()
+        provider = telemetry.provider_from_endpoint(self.endpoint)
+        ctx = telemetry.get_decision_context()
+        span_name = f"chat {self.model}"
+        with tracer.start_as_current_span(span_name, kind=SpanKind.CLIENT) as span:
+            _set_if(span, "gen_ai.operation.name", "chat")
+            _set_if(span, "gen_ai.provider.name", provider)
+            _set_if(span, "gen_ai.request.model", self.model)
+            _set_if(span, "gen_ai.request.temperature", 0.4)
+            for key, value in telemetry.server_attrs(self.endpoint).items():
+                _set_if(span, key, value)
+            _set_beergame_attrs(span, view, ctx)
+
+            request_kwargs = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": _user_prompt(view)},
                 ],
-                temperature=0.4,
-                max_tokens=256,
-                timeout=60,
-            )
-            msg = response.choices[0].message
-            content = (msg.content or "").strip()
-            reasoning = (getattr(msg, "reasoning", None) or "").strip()
+                "temperature": 0.4,
+                "max_tokens": 256,
+                "timeout": 60,
+            }
+            if ctx and ctx.llm_seed is not None:
+                request_kwargs["seed"] = ctx.llm_seed
+                _set_if(span, "gen_ai.request.seed", ctx.llm_seed)
 
-            # Strategy: isolate the model's *final* answer, which is whatever
-            # comes after any explicit reasoning.
-            #   1. Reasoning-field models (gpt-oss): content IS the answer.
-            #   2. Inline <think>...</think> models (qwen3, gemma4): use text
-            #      after the last </think>.
-            #   3. Plain models (mistral, phi4): the answer is typically the
-            #      FIRST integer in the response; later numbers are just
-            #      justification (e.g. "Order 4 because inventory is 12").
-            if content:
-                if "</think>" in content:
-                    answer_region = content.rsplit("</think>", 1)[-1]
-                    matches = re.findall(r"-?\d+", answer_region)
-                    if matches:
-                        return max(0, int(matches[0]))
-                matches = re.findall(r"-?\d+", content)
-                if matches:
-                    return max(0, int(matches[0]))
-            # Fallback: reasoning field only (e.g. gpt-oss with empty content).
-            if reasoning:
-                matches = re.findall(r"-?\d+", reasoning)
-                if matches:
-                    return max(0, int(matches[-1]))
-            return 0
-        except Exception as e:  # pragma: no cover - network error path
-            print(f"[GABM:{self.role}] decision error: {e}; defaulting to 0")
-            return 0
+            try:
+                response = self.client.chat.completions.create(**request_kwargs)
+                _set_response_attrs(span, response)
+                msg = _first_message(response)
+                content = (getattr(msg, "content", None) or "").strip() if msg else ""
+                reasoning = (
+                    (getattr(msg, "reasoning", None) or "").strip() if msg else ""
+                )
+                decision, parse_ok, parse_strategy = _parse_order(content, reasoning)
+                _set_if(span, "beergame.parse_ok", parse_ok)
+                _set_if(span, "beergame.parse_strategy", parse_strategy)
+                _set_if(span, "beergame.decision_int", decision)
+                return decision
+            except Exception as e:  # pragma: no cover - network error path
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                _set_if(span, "error.type", type(e).__name__)
+                _set_if(span, "beergame.parse_ok", False)
+                _set_if(span, "beergame.parse_strategy", "failed")
+                _set_if(span, "beergame.decision_int", 0)
+                print(f"[GABM:{self.role}] decision error: {e}; defaulting to 0")
+                return 0
+
+
+def _set_if(span, key: str, value) -> None:
+    if value is not None:
+        span.set_attribute(key, value)
+
+
+def _set_beergame_attrs(
+    span, view: PlayerView, ctx: telemetry.DecisionContext | None
+) -> None:
+    _set_if(span, "beergame.week", view.week)
+    _set_if(span, "beergame.role", view.role.lower())
+    if ctx is None:
+        return
+    _set_if(span, "beergame.run_id", ctx.run_id)
+    _set_if(span, "beergame.game_id", ctx.game_id)
+    _set_if(span, "beergame.scenario_id", ctx.scenario_id)
+    _set_if(span, "beergame.scenario_release", ctx.scenario_release)
+    _set_if(span, "beergame.epoch", ctx.epoch)
+    _set_if(span, "beergame.cache_hit", ctx.cache_hit)
+    _set_if(span, "beergame.context_used", ctx.context_used)
+    _set_if(span, "beergame.context_window", ctx.context_window)
+
+
+def _set_response_attrs(span, response) -> None:
+    _set_if(span, "gen_ai.response.model", getattr(response, "model", None))
+    _set_if(span, "gen_ai.response.id", getattr(response, "id", None))
+    finish_reason = _first_finish_reason(response)
+    if finish_reason is not None:
+        span.set_attribute("gen_ai.response.finish_reasons", [finish_reason])
+
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return
+    _set_if(
+        span,
+        "gen_ai.usage.input_tokens",
+        _get_first_attr(usage, "input_tokens", "prompt_tokens"),
+    )
+    _set_if(
+        span,
+        "gen_ai.usage.output_tokens",
+        _get_first_attr(usage, "output_tokens", "completion_tokens"),
+    )
+    completion_details = getattr(usage, "completion_tokens_details", None)
+    _set_if(
+        span,
+        "gen_ai.usage.reasoning.output_tokens",
+        _get_first_attr(completion_details, "reasoning_tokens"),
+    )
+    prompt_details = getattr(usage, "prompt_tokens_details", None)
+    _set_if(
+        span,
+        "gen_ai.usage.cache_read.input_tokens",
+        _get_first_attr(prompt_details, "cached_tokens"),
+    )
+
+
+def _get_first_attr(obj, *names: str):
+    if obj is None:
+        return None
+    for name in names:
+        value = getattr(obj, name, None)
+        if value is not None:
+            return value
+    return None
+
+
+def _first_message(response):
+    choices = getattr(response, "choices", None) or []
+    if not choices:
+        return None
+    return getattr(choices[0], "message", None)
+
+
+def _first_finish_reason(response) -> str | None:
+    choices = getattr(response, "choices", None) or []
+    if not choices:
+        return None
+    return getattr(choices[0], "finish_reason", None)
+
+
+def _parse_order(content: str, reasoning: str) -> tuple[int, bool, str]:
+    # Strategy: isolate the model's final answer, which follows any reasoning.
+    if content:
+        if "</think>" in content:
+            answer_region = content.rsplit("</think>", 1)[-1]
+            matches = re.findall(r"-?\d+", answer_region)
+            if matches:
+                return max(0, int(matches[0])), True, "after_think_first_int"
+        matches = re.findall(r"-?\d+", content)
+        if matches:
+            return max(0, int(matches[0])), True, "first_int"
+    if reasoning:
+        matches = re.findall(r"-?\d+", reasoning)
+        if matches:
+            return max(0, int(matches[-1])), True, "reasoning_last_int"
+    return 0, False, "failed"
 
 
 _AGENTS: Dict[str, GABMAgent] = {}
