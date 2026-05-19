@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "2026-05-19T160000Z-minimal",
+  "started_at": "2026-05-19T16:00:00Z",
+  "ended_at": "2026-05-19T16:00:05Z",
+  "git_sha": null,
+  "git_dirty": false,
+  "prompt_version": null,
+  "config_hash": "sha256:minimal",
+  "config": {
+    "active_release": "2026-Q2",
+    "weeks": 1,
+    "epochs": 1
+  },
+  "active_release": "2026-Q2",
+  "run_seed": 12345,
+  "models": [
+    {
+      "id": "example-model",
+      "provider": "example",
+      "endpoint": "http://localhost:11434/v1",
+      "temperature": 0.4,
+      "top_p": null
+    }
+  ],
+  "scenario_ids": ["step_4_8_1w"],
+  "tool_versions": {
+    "beer-game": "0.1.0",
+    "python": "3.13"
+  }
+}

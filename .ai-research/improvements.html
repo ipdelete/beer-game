@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Beer-Game — Improvement Plan (v2)</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #666;
+    --bg: #ffffff;
+    --accent: #2563eb;
+    --border: #e5e5e5;
+    --code-bg: #f6f6f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    max-width: 800px;
+    margin: 3rem auto;
+    padding: 0 1.5rem;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  h1 { font-size: 1.75rem; font-weight: 600; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; margin: 2.25rem 0 0.75rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.4rem; }
+  p, ul, ol { margin: 0.5rem 0; }
+  ul li, ol li { margin: 0.3rem 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.88em; }
+  pre { background: var(--code-bg); padding: 0.75rem 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; }
+  .lede { color: var(--muted); margin-bottom: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 600; background: var(--code-bg); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .note { background: var(--code-bg); border-left: 3px solid var(--accent); padding: 0.6rem 0.9rem; margin: 0.75rem 0; border-radius: 3px; font-size: 0.92rem; }
+</style>
+</head>
+<body>
+
+<h1>Beer-Game — Improvement Plan (v2)</h1>
+<p class="lede">Revised after research into AgentBench, Inspect AI, LiveBench, and current OpenTelemetry GenAI conventions. Two architectural decisions changed.</p>
+
+<h2>What Changed Since v1</h2>
+<table>
+  <thead><tr><th>Decision</th><th>v1</th><th>v2</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Result storage</td><td>SQLite per run</td><td><strong>Bundle: JSONL + Parquet + manifest</strong> (Inspect <code>.eval</code> style)</td><td>The field has converged on files; SQLite buys nothing for write-once-read-many analytics.</td></tr>
+    <tr><td>Telemetry</td><td>Custom app-level schema</td><td><strong>OpenTelemetry GenAI conventions</strong> → custom processor → Parquet</td><td>Standard schema, free tooling, future-proof.</td></tr>
+    <tr><td>Contamination resistance</td><td>Procedural scenarios (priority 3)</td><td><strong>Release-date gating first</strong>; procedural in phase 2</td><td>LiveBench shows release tagging buys most of the win for far less effort.</td></tr>
+    <tr><td>K-run variance</td><td>Custom impl</td><td><strong>Inspect-style <code>epochs</code> + reducers</strong></td><td>Mature pattern; bootstrap_stderr out of the box.</td></tr>
+    <tr><td>Metrics</td><td>Add columns ad-hoc</td><td><strong><code>@metric</code> registry</strong> (Inspect pattern)</td><td>New metrics become one decorated function.</td></tr>
+  </tbody>
+</table>
+
+<h2>Revised Priority Order</h2>
+<table>
+  <thead><tr><th>#</th><th>Change</th><th>Foundation?</th><th>Source pattern</th></tr></thead>
+  <tbody>
+    <tr><td class="num">1</td><td><strong>Bundle output format</strong> (manifest + JSONL + Parquet, zipped per run)</td><td>yes</td><td>Inspect AI <code>.eval</code></td></tr>
+    <tr><td class="num">2</td><td><strong>OTel-based telemetry</strong> wrapping the model client</td><td>yes</td><td>OpenTelemetry GenAI conventions</td></tr>
+    <tr><td class="num">3</td><td><strong>Release-date gating</strong> on scenarios (even with one scenario today)</td><td>yes</td><td>LiveBench</td></tr>
+    <tr><td class="num">4</td><td><strong>Metric registry</strong> (<code>@metric</code> decorator)</td><td>yes</td><td>Inspect AI</td></tr>
+    <tr><td class="num">5</td><td><strong>Bullwhip + recovery-time metrics</strong> as first registered metrics</td><td></td><td>Native</td></tr>
+    <tr><td class="num">6</td><td><strong>K-run variance via epochs + reducers</strong> (mean, std, stderr, bootstrap_stderr)</td><td></td><td>Inspect AI</td></tr>
+    <tr><td class="num">7</td><td><strong>Multi-strategy parser</strong> with ordered fallbacks; track strategy used</td><td></td><td>LiveBench</td></tr>
+    <tr><td class="num">8</td><td><strong>Response cache</strong> keyed on <code>(model, config, prompt, scenario, seed, epoch)</code></td><td></td><td>Inspect AI</td></tr>
+    <tr><td class="num">9</td><td><strong>YAML config</strong> with import/default/overwrite + per-model YAML</td><td></td><td>AgentBench + LiveBench</td></tr>
+    <tr><td class="num">10</td><td><strong>Procedural scenarios</strong> (constant, step, ramp, sinusoid, random)</td><td></td><td>Native (LiveBench-inspired)</td></tr>
+    <tr><td class="num">11</td><td><strong>Statistical significance in leaderboard</strong> (paired bootstrap)</td><td></td><td>Native</td></tr>
+  </tbody>
+</table>
+
+<h2>1. Storage — Bundle Format</h2>
+<p>One run produces one bundle (directory or zip). Single artifact, multiple files inside.</p>
+<pre>runs/&lt;run_id&gt;.eval/
+  manifest.json          # provenance: git_sha, prompt_version, scenario_release,
+                         # config snapshot, model list, started_at
+  scenarios.jsonl        # one line per scenario (id, demand, costs, weeks,
+                         # release_date, removal_date, seed)
+  games.jsonl            # one line per game (game_id, run_id, scenario_id,
+                         # model, seed, epoch, total_cost, bullwhip, wall_s)
+  decisions.parquet      # high-volume per-LLM-call telemetry (OTel attrs)
+  states.parquet         # per (game, week, role): inventory, backlog, order,
+                         # shipment, cost
+  traces/                # optional full conversation logs
+    &lt;game_id&gt;.jsonl
+  report.html            # generated static report
+</pre>
+<div class="note"><strong>Why this beats SQLite:</strong> queryable with DuckDB directly (<code>SELECT * FROM 'runs/*.eval/games.jsonl'</code>), Parquet handles the hot path (10k+ decisions per run), JSONL is human-readable and grep-able, bundle is one artifact to share.</div>
+
+<h2>2. Telemetry — OpenTelemetry GenAI Conventions</h2>
+<p>Wrap the model client once. Emit OTel spans + metrics following the GenAI conventions. Custom span processor writes attributes into <code>decisions.parquet</code> as spans complete.</p>
+
+<h3>Adopted span attributes (GenAI conventions, current as of late 2025)</h3>
+<table>
+  <thead><tr><th>Attribute</th><th>Use</th></tr></thead>
+  <tbody>
+    <tr><td><code>gen_ai.operation.name</code></td><td><code>chat</code></td></tr>
+    <tr><td><code>gen_ai.provider.name</code></td><td><code>openai</code> / <code>ollama</code> / <code>vllm</code></td></tr>
+    <tr><td><code>gen_ai.request.model</code></td><td>e.g. <code>qwen3.5:9b</code></td></tr>
+    <tr><td><code>gen_ai.response.model</code></td><td>actual model returned</td></tr>
+    <tr><td><code>gen_ai.request.temperature</code> / <code>top_p</code> / <code>seed</code></td><td>sampling config</td></tr>
+    <tr><td><code>gen_ai.usage.input_tokens</code> / <code>output_tokens</code></td><td>token counts</td></tr>
+    <tr><td><code>gen_ai.usage.reasoning.output_tokens</code></td><td>for reasoning models</td></tr>
+    <tr><td><code>gen_ai.response.finish_reasons</code></td><td><code>stop</code> / <code>length</code></td></tr>
+    <tr><td><code>gen_ai.response.time_to_first_chunk</code></td><td>streaming TTFT</td></tr>
+    <tr><td><code>gen_ai.response.id</code></td><td>response identifier</td></tr>
+  </tbody>
+</table>
+
+<h3>Adopted client metrics</h3>
+<ul>
+  <li><code>gen_ai.client.token.usage</code> — histogram with <code>gen_ai.token.type</code> = input/output</li>
+  <li><code>gen_ai.client.operation.duration</code> — histogram</li>
+  <li><code>gen_ai.client.operation.time_to_first_chunk</code> — histogram (streaming)</li>
+  <li><code>gen_ai.client.operation.time_per_output_chunk</code> — histogram (streaming)</li>
+</ul>
+
+<h3>Beer-game-specific custom attributes</h3>
+<table>
+  <thead><tr><th>Attribute</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>beergame.scenario_id</code></td><td>which scenario</td></tr>
+    <tr><td><code>beergame.scenario_release</code></td><td>release tag pinned for the run</td></tr>
+    <tr><td><code>beergame.game_id</code> / <code>week</code> / <code>role</code></td><td>position in run</td></tr>
+    <tr><td><code>beergame.epoch</code></td><td>which k-run</td></tr>
+    <tr><td><code>beergame.context_used</code> / <code>context_window</code></td><td>local-model "cost"</td></tr>
+    <tr><td><code>beergame.parse_ok</code> / <code>parse_strategy</code></td><td>which fallback succeeded</td></tr>
+    <tr><td><code>beergame.decision_int</code></td><td>parsed order</td></tr>
+  </tbody>
+</table>
+
+<h3>Architecture</h3>
+<pre>LLM call
+  └── OTel span (gen_ai.* + beergame.* attributes)
+        ├── → Parquet writer  (custom span processor → decisions.parquet)
+        └── → OTLP exporter   (optional; pipe to Jaeger/Tempo for debug)</pre>
+
+<div class="note"><strong>Caveat:</strong> GenAI conventions are still status <em>Development</em> (not Stable) as of late 2025. Snapshot parsed values into stable column names you control in Parquet so a convention rename doesn't break historical data.</div>
+
+<h2>3. Release-Date Gating (Borrowed from LiveBench)</h2>
+<p>Each scenario carries:</p>
+<pre>{ "scenario_id": "step_4_8_50w",
+  "demand_pattern": "step",
+  "params": { "low": 4, "high": 8, "step_week": 5 },
+  "release_date": "2026-Q1",
+  "removal_date": null,
+  "seed": 42 }</pre>
+<p>Runs pin <code>active_release</code>. <code>load_scenarios()</code> filters: <code>release_date &lt;= active</code> AND <code>(removal_date is null OR removal_date &gt; active)</code>. Memorized scenarios get retired.</p>
+
+<h2>4. Metric Registry (Borrowed from Inspect AI)</h2>
+<pre>@metric
+def bullwhip_amplification():
+    def compute(games: list[GameResult]) -&gt; float:
+        return std(game.factory_orders) / std(game.customer_demand)
+    return compute
+
+@metric
+def parse_failure_rate():
+    def compute(decisions: list[Decision]) -&gt; float:
+        return sum(1 for d in decisions if not d.parse_ok) / len(decisions)
+    return compute
+</pre>
+<p>Metrics declare themselves at import. <code>report.py</code> discovers them via the registry. Adding a new metric never touches core code.</p>
+
+<h2>5. Multi-Strategy Parser (Borrowed from LiveBench)</h2>
+<pre>STRATEGIES = [
+    ("strict_int",         lambda s: int(s.strip())),
+    ("last_line_int",      lambda s: int(re.search(r"\d+", s.splitlines()[-1]).group())),
+    ("first_int_anywhere", lambda s: int(re.search(r"\d+", s).group())),
+    ("json_field",         lambda s: int(json.loads(s)["order"])),
+]
+for name, parse in STRATEGIES:
+    try: return parse(raw), name
+    except Exception: continue
+return None, "failed"</pre>
+<p>Track <code>parse_strategy</code> per call in <code>decisions.parquet</code>. Compute parse-failure rate per model as a capability signal.</p>
+
+<h2>What to Skip / Defer</h2>
+<ul>
+  <li><strong>SQLite</strong> — not how the field stores eval data.</li>
+  <li><strong>Web dashboard</strong> — static HTML from the bundle is enough.</li>
+  <li><strong>Distributed tracing backend</strong> — OTLP file exporter for archival; only run a Jaeger/Tempo if debugging a single weird run.</li>
+  <li><strong>GPU utilization tracking</strong> — non-portable, not worth the engineering until requested.</li>
+</ul>
+
+<h2>Revised First Sprint</h2>
+<ol>
+  <li><strong>Bundle writer.</strong> Define the JSON manifest schema, scenarios.jsonl shape, and Parquet schemas for decisions + states. Implement append-as-you-go writers.</li>
+  <li><strong>OTel-instrumented model client.</strong> Wrap the existing <code>openai.OpenAI</code> client. Emit spans following GenAI conventions, plus <code>beergame.*</code> attributes.</li>
+  <li><strong>Custom span processor</strong> → writes attributes to <code>decisions.parquet</code> on span end.</li>
+  <li><strong>Scenario release tagging.</strong> Add release_date / removal_date to scenario definitions and a load-time filter.</li>
+  <li><strong>Metric registry + first 4 metrics</strong>: cost, bullwhip, recovery_time, parse_rate.</li>
+  <li><strong><code>report.py</code></strong> consumes a bundle, queries via DuckDB, outputs static HTML report.</li>
+</ol>
+<p>Everything else (k-run epochs, response cache, procedural scenarios, YAML config, significance testing) builds on this foundation.</p>
+
+<h2>Expected Impact</h2>
+<table>
+  <thead><tr><th>Axis</th><th>Current</th><th>After sprint</th><th>After full plan</th></tr></thead>
+  <tbody>
+    <tr><td>Validity</td><td class="num">2</td><td class="num">3</td><td class="num">4</td></tr>
+    <tr><td>Reliability</td><td class="num">1</td><td class="num">3</td><td class="num">4</td></tr>
+    <tr><td>Coverage</td><td class="num">1</td><td class="num">2</td><td class="num">3</td></tr>
+    <tr><td>Reporting</td><td class="num">3</td><td class="num">4</td><td class="num">5</td></tr>
+    <tr><td>Tooling quality</td><td class="num">3</td><td class="num">4</td><td class="num">4</td></tr>
+    <tr><td><strong>Composite</strong></td><td class="num"><strong>2.5</strong></td><td class="num"><strong>3.2</strong></td><td class="num"><strong>3.8</strong></td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>

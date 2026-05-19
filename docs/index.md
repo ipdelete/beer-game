@@ -12,6 +12,8 @@ quantitative benchmark for local language models running under Ollama.
 - **[Benchmark findings](./benchmark-findings.md)** — the main writeup:
   motivation, hardware, methodology, 5-model leaderboard, limitations,
   and a GABM / AutoGen appendix.
+- **[Bundle schema](./bundle.md)** — the `.eval` artifact contract for
+  manifest, JSONL, Parquet, seeds, and DuckDB queries.
 - **[Tournament summary](./tournament_summary.md)** — raw leaderboard
   table for quick reference.
 

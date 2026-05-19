@@ -1,0 +1,1 @@
+{"game_id":"2026-05-19T160000Z-game-minimal","run_id":"2026-05-19T160000Z-minimal","scenario_id":"step_4_8_1w","model":"example-model","epoch":0,"demand_seed":2882400001,"llm_seed":305419896,"started_at":"2026-05-19T16:00:01Z","ended_at":"2026-05-19T16:00:05Z","status":"ok","error":null,"demand_hash":"c706ffd80b0ad0a4ef605c581e95252b","total_cost":12.0,"wall_seconds":4.0}

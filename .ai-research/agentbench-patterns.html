@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AgentBench — How They Implement the Things We Care About</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #666;
+    --bg: #ffffff;
+    --accent: #2563eb;
+    --border: #e5e5e5;
+    --code-bg: #f6f6f6;
+    --pro: #16a34a;
+    --con: #dc2626;
+    --warn: #d97706;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    max-width: 780px;
+    margin: 3rem auto;
+    padding: 0 1.5rem;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  h1 { font-size: 1.75rem; font-weight: 600; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; margin: 2.25rem 0 0.75rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.4rem; }
+  p, ul, ol { margin: 0.5rem 0; }
+  ul li, ol li { margin: 0.3rem 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.9em; }
+  pre { background: var(--code-bg); padding: 0.75rem 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.85rem; line-height: 1.45; }
+  .lede { color: var(--muted); margin-bottom: 1.5rem; }
+  .verdict { background: var(--code-bg); border-left: 3px solid var(--accent); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 3px; }
+  .badge { display: inline-block; font-size: 0.78rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 3px; margin-left: 0.4rem; vertical-align: middle; }
+  .b-yes { background: #dcfce7; color: var(--pro); }
+  .b-partial { background: #fef3c7; color: var(--warn); }
+  .b-no { background: #fee2e2; color: var(--con); }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 600; background: var(--code-bg); }
+</style>
+</head>
+<body>
+
+<h1>AgentBench — How They Implement the Things We Care About</h1>
+<p class="lede">Looking at the 8 improvement areas, what does AgentBench actually do? Findings from <code>/tmp/AgentBench</code>.</p>
+
+<h2>TL;DR</h2>
+<div class="verdict">
+AgentBench is a good reference for <strong>config composition</strong> and <strong>resume mechanics</strong>. It is <em>not</em> a reference for telemetry, variance, procedural scenarios, or data architecture — it doesn't really solve those. That's good news: we can leapfrog them on the axes that matter most for local-model evaluation.
+</div>
+
+<h2>Scorecard</h2>
+<table>
+  <thead><tr><th>Area</th><th>AgentBench has it?</th><th>Useful to copy?</th></tr></thead>
+  <tbody>
+    <tr><td>Data architecture</td><td><span class="badge b-partial">partial</span></td><td>Some — JSONL append pattern, output dir layout</td></tr>
+    <tr><td>Telemetry</td><td><span class="badge b-no">no</span></td><td>One nugget: context-limit error detection</td></tr>
+    <tr><td>Procedural scenarios</td><td><span class="badge b-no">no</span></td><td>Nothing — all static datasets</td></tr>
+    <tr><td>K-run variance</td><td><span class="badge b-no">no</span></td><td>Nothing — no seed/repeat support at all</td></tr>
+    <tr><td>First-class metrics</td><td><span class="badge b-no">no</span></td><td>Nothing — ad-hoc per-task</td></tr>
+    <tr><td>Multi-strategy parsing</td><td><span class="badge b-partial">partial</span></td><td>Some — parse-failure handling patterns</td></tr>
+    <tr><td>Resume / caching</td><td><span class="badge b-yes">yes</span></td><td>Yes — simple, effective</td></tr>
+    <tr><td>Declarative config</td><td><span class="badge b-yes">yes</span></td><td>Yes — YAML import/default/overwrite is great</td></tr>
+  </tbody>
+</table>
+
+<h2>1. Data Architecture <span class="badge b-partial">partial</span></h2>
+<p>Output is plain JSONL + JSON files, no DB.</p>
+<ul>
+  <li><code>output/{agent}/{task}/runs.jsonl</code> — one line per completed sample (<code>src/assigner.py:368-379</code>)</li>
+  <li><code>output/{agent}/{task}/overall.json</code> — written when all samples finish (<code>src/assigner.py:304-312</code>)</li>
+  <li><code>output/{TIMESTAMP}/config.yaml</code> — copy of the run config at the root (<code>src/assigner.py:71-76</code>)</li>
+</ul>
+<p><strong>What's missing:</strong> no manifest, no schema versioning, no SQLite/parquet, no provenance (git SHA, prompt version). Correlation back to inputs is only via the <code>index</code> field plus the saved config.</p>
+<p><strong>Takeaway:</strong> the directory shape (<code>output/{agent}/{task}/</code>) is nice. The append-only JSONL with replay-on-resume is nice. Everything else we want (manifest, structured schema, queryability) we have to build ourselves.</p>
+
+<h2>2. Telemetry <span class="badge b-no">no</span></h2>
+<p>Per-LLM-call instrumentation is essentially absent.</p>
+<ul>
+  <li>Each completed sample gets a <code>timestamp</code> in <code>runs.jsonl</code> (<code>src/assigner.py:354-367</code>) — that's the only timing data.</li>
+  <li><code>HTTPAgent.inference()</code> retries and returns response JSON, no timing or token capture (<code>src/client/agents/http_agent.py:188-215</code>).</li>
+  <li><code>FastChatAgent.inference()</code> streams text, no token/timing accounting (<code>src/client/agents/fastchat_client.py:127-192</code>).</li>
+  <li><code>Claude.inference()</code> returns completion text only (<code>src/client/agents/claude_agent.py:26-37</code>).</li>
+  <li><strong>One useful nugget:</strong> they have a regex-based context-limit detector for HTTP errors — looks for "prompt/context/tokens" + "limit/exceed/max…" in error messages (<code>src/client/agents/http_agent.py:138-161</code>). Good defensive pattern.</li>
+</ul>
+<p><strong>Takeaway:</strong> we are not behind here — we are <em>ahead by intent</em>. Our planned telemetry (per-call latency, tokens, context utilization, parse status) would put us substantially ahead of AgentBench's observability.</p>
+
+<h2>3. Procedural Scenarios <span class="badge b-no">no</span></h2>
+<p>All tasks load static datasets and index into them.</p>
+<ul>
+  <li>DBBench: <code>range(len(self.dataset))</code> over JSON/JSONL (<code>dbbench/task.py:55-77</code>)</li>
+  <li>KnowledgeGraph: <code>range(len(self.data))</code> from one JSON (<code>knowledgegraph/task.py:44-61</code>)</li>
+  <li>WebShop: <code>range(*self.ranging)</code> from config (<code>webshop/task.py:37-45</code>)</li>
+  <li>ALFWorld: <code>range(len(self.data_files))</code> from <code>split.json</code> (<code>alfworld/task.py:51-77</code>)</li>
+</ul>
+<p>No difficulty tiers, no template-based synthesis, no seed-based variation in task constructors.</p>
+<p><strong>Takeaway:</strong> nothing to copy. Our procedural-scenario plan would be novel relative to AgentBench. This is also why their contamination resistance is the same as ours — bad.</p>
+
+<h2>4. K-Run Variance <span class="badge b-no">no</span></h2>
+<p>No <code>k</code>, <code>repeat</code>, <code>trial</code>, <code>seed</code>, variance, std-dev, or CI in <code>src/typings/config.py</code> or <code>src/assigner.py</code>.</p>
+<p>Config schema only has <code>assignments</code>, <code>concurrency</code>, <code>definition</code>, <code>output</code> (<code>src/typings/config.py:31-35</code>). Scoring returns single aggregate values.</p>
+<p><strong>Takeaway:</strong> AgentBench publishes single-run leaderboard numbers, same credibility problem we have. Our k-run plan would be a real differentiator.</p>
+
+<h2>5. First-Class Metrics Pattern <span class="badge b-no">no</span></h2>
+<p>No shared metric interface. Each task implements its own scoring.</p>
+<ul>
+  <li>WebShop: average reward (<code>webshop/task.py:179-201</code>)</li>
+  <li>ALFWorld: total/pass/wrong/success_rate (<code>alfworld/task.py:79-92</code>)</li>
+  <li>KnowledgeGraph: F1 computed inline (<code>knowledgegraph/task.py:116-123</code>, <code>216-233</code>)</li>
+  <li>DBBench: correctness returned per sample (<code>dbbench/task.py:171-225</code>)</li>
+</ul>
+<p>Adding a new metric means editing that task's <code>calculate_overall</code>. The assigner just calls it (<code>src/assigner.py:304-311</code>).</p>
+<p><strong>Takeaway:</strong> we should do better — a metric registry / interface where bullwhip, cost, recovery-time, latency, parse-rate are all pluggable. Modeled more on HELM than AgentBench.</p>
+
+<h2>6. Multi-Strategy Parsing <span class="badge b-partial">partial</span></h2>
+<p>All tasks parse tool calls via <code>json.loads(arguments)</code>. Different tasks handle failures differently:</p>
+<ul>
+  <li><strong>DBBench:</strong> malformed tool call → inject tool error message and continue (<code>dbbench/task.py:139-146</code>) — most forgiving</li>
+  <li><strong>KnowledgeGraph:</strong> missing tool calls → ask model to recheck; parse error → inject error (<code>knowledgegraph/task.py:100-137</code>)</li>
+  <li><strong>WebShop:</strong> malformed → log warning, inject "no valid tool call", <strong>return early with zero reward</strong> (<code>webshop/task.py:98-116</code>) — least forgiving</li>
+</ul>
+<p>No JSON-mode usage, no regex fallbacks, no multi-attempt parsing. Retries happen only at the HTTP layer (network errors), not for parse failures.</p>
+<p><strong>Takeaway:</strong> the "inject error and let the model self-correct" pattern is worth borrowing. But there's no robust multi-strategy parser to copy — we'd build that ourselves. Tracking parse-failure-rate as a per-model metric (which AgentBench doesn't do) would be a real edge.</p>
+
+<h2>7. Resume / Caching <span class="badge b-yes">yes</span></h2>
+<p>Clean and simple — this is worth copying directly.</p>
+<pre># Skip the whole (agent, task) if overall.json exists
+if os.path.exists(overall_path):
+    continue  # src/assigner.py:83-86
+
+# Otherwise replay runs.jsonl to find finished indices
+for line in open(runs_jsonl):
+    record = json.loads(line)
+    if record["index"] in remaining:
+        remaining.remove(record["index"])  # src/assigner.py:96-111</pre>
+<p><strong>Cache key:</strong> <code>(agent, task, index)</code>. Completed samples only — LLM responses are not cached.</p>
+<p><strong>Limitation:</strong> no invalidation if the prompt or config changes — they assume you'd start a new output directory.</p>
+<p><strong>Takeaway:</strong> copy the pattern. Add prompt-version + config-hash to the cache key so a prompt edit invalidates correctly.</p>
+
+<h2>8. Declarative Config <span class="badge b-yes">yes</span></h2>
+<p>This is AgentBench's strongest feature for our purposes.</p>
+<ul>
+  <li><strong>YAML loader</strong> supports <code>import</code>, <code>default</code>, <code>overwrite</code> composition (<code>src/configs.py:25-115</code>)</li>
+  <li><strong>Assignment</strong> = list of <code>{agent, task}</code> pairs; either side can be a list and gets expanded (<code>src/typings/config.py:37-58</code>)</li>
+  <li><strong>Concurrency</strong> per agent and per task (capacity maps)</li>
+  <li><strong>Output</strong> defaults to <code>output/{TIMESTAMP}</code></li>
+</ul>
+<p>Example (<code>configs/assignments/default.yaml</code>): imports <code>definition.yaml</code>, sets concurrency, assigns one agent to two tasks, writes to <code>outputs/{TIMESTAMP}</code>.</p>
+<p><strong>Gap:</strong> <code>output: "./runs/foo"</code> works, but <strong>k=5 seeds is not supported</strong> — no <code>seed/k/repeat</code> field anywhere.</p>
+<p><strong>Takeaway:</strong> the YAML import/default/overwrite pattern is well-designed and a good blueprint. We'd extend it with seed/k/scenario-generation fields.</p>
+
+<h2>Net Summary</h2>
+<table>
+  <thead><tr><th>What to copy</th><th>What to build ourselves</th><th>What to skip</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>
+        Output dir shape (<code>output/{agent}/{task}/</code>)<br>
+        JSONL append + replay-on-resume<br>
+        Cache key <code>(agent, task, index)</code><br>
+        YAML import/default/overwrite config<br>
+        Context-limit error regex detector<br>
+        "Inject error, let model self-correct" parse-failure pattern
+      </td>
+      <td>
+        SQLite-per-run with manifest<br>
+        Per-call telemetry (latency, tokens, context%)<br>
+        Procedural scenario generator<br>
+        K-run variance + 95% CIs<br>
+        First-class metric registry<br>
+        Multi-strategy parser with fallbacks<br>
+        Prompt-version cache invalidation
+      </td>
+      <td>
+        Their Docker-per-task infra<br>
+        External <code>agentrl.worker.task</code> dependency<br>
+        Bipartite Agent↔Task scheduler (overkill for us)<br>
+        Per-task bespoke <code>calculate_overall</code> (anti-pattern)
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Implication for the Plan</h2>
+<p>The improvement plan stands. We're not playing catch-up to AgentBench on most axes — on telemetry, variance, scenarios, and metrics architecture, <strong>we'd be doing things AgentBench doesn't do</strong>. The two areas where AgentBench is genuinely good (resume + declarative config) are worth borrowing in shape, not in code.</p>
+
+</body>
+</html>
