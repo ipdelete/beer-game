@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Evaluation Criteria for Benchmark Tooling</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #666;
+    --bg: #ffffff;
+    --accent: #2563eb;
+    --border: #e5e5e5;
+    --code-bg: #f6f6f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    max-width: 760px;
+    margin: 3rem auto;
+    padding: 0 1.5rem;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  h1 { font-size: 1.75rem; font-weight: 600; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; margin: 2.25rem 0 0.75rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.4rem; }
+  p, ul, ol { margin: 0.5rem 0; }
+  ul li, ol li { margin: 0.25rem 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .lede { color: var(--muted); margin-bottom: 2rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  th { font-weight: 600; background: var(--code-bg); }
+  strong.hilite { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Evaluation Criteria for Benchmark Tooling</h1>
+<p class="lede">Framework for assessing benchmark tools. Used to guide the design of the beer-game benchmark tool for local models.</p>
+
+<h2>1. Validity — Does it measure what it claims?</h2>
+<ul>
+  <li><strong>Construct validity:</strong> Does the task actually test the intended capability (reasoning vs. recall vs. memorization)?</li>
+  <li><strong>Contamination resistance:</strong> Are test items absent from training data? Refreshable? Held-out?</li>
+  <li><strong>Discriminative power:</strong> Can it distinguish strong from weak models, or do results cluster?</li>
+  <li><strong>Ecological validity:</strong> Does performance correlate with real-world usefulness?</li>
+</ul>
+
+<h2>2. Reliability — Is it reproducible?</h2>
+<ul>
+  <li><strong>Determinism:</strong> Same input + seed → same score (temperature, sampling, tool-call ordering controlled).</li>
+  <li><strong>Test-retest stability:</strong> Re-running yields the same ranking and similar scores.</li>
+  <li><strong>Inter-rater agreement:</strong> For LLM-as-judge or human eval, do judges agree?</li>
+  <li><strong>Variance reporting:</strong> Confidence intervals and standard error, not just point estimates.</li>
+</ul>
+
+<h2>3. Coverage & Difficulty</h2>
+<ul>
+  <li><strong>Breadth:</strong> Range of skills/domains/scenarios covered.</li>
+  <li><strong>Depth:</strong> Does it stress frontier models, or is it saturated?</li>
+  <li><strong>Difficulty calibration:</strong> Distribution of easy/medium/hard items.</li>
+  <li><strong>Headroom:</strong> Room for improvement remaining at the top.</li>
+</ul>
+
+<h2>4. Fairness & Robustness</h2>
+<ul>
+  <li><strong>Prompt sensitivity:</strong> Small wording changes shouldn't flip results.</li>
+  <li><strong>Format bias:</strong> Avoid privileging certain output styles (MCQ vs. free-form).</li>
+  <li><strong>Tokenizer fairness:</strong> No undue disadvantage to specific languages or model families.</li>
+  <li><strong>Bias/safety dimensions:</strong> Report demographic and content disparities where relevant.</li>
+</ul>
+
+<h2>5. Tooling Quality (Engineering)</h2>
+<ul>
+  <li><strong>Ease of integration:</strong> Minutes to plug in a new model.</li>
+  <li><strong>Model interface flexibility:</strong> OpenAI API, HF Transformers, vLLM, Ollama, llama.cpp, MLX.</li>
+  <li><strong>Sandboxing & safety:</strong> Safe execution of untrusted code/agent actions (Docker, gVisor, Firejail).</li>
+  <li><strong>Parallelism & speed:</strong> Async, batching, request pipelining.</li>
+  <li><strong>Caching & resumability:</strong> Skip completed items; resume after crashes.</li>
+  <li><strong>Logging & traces:</strong> Full request/response logs for debugging.</li>
+  <li><strong>Extensibility:</strong> Low friction for new tasks, solvers, and scorers.</li>
+</ul>
+
+<h2>6. Cost & Efficiency</h2>
+<ul>
+  <li><strong>Total tokens & wall-clock time</strong> per full run.</li>
+  <li><strong>Compute requirements:</strong> Local vs. API; GPU/CPU/RAM footprint.</li>
+  <li><strong>Cost per eval:</strong> Especially important for closed-API models.</li>
+  <li><strong>Sample efficiency:</strong> Can a small subset (~200 items) approximate the full run?</li>
+</ul>
+
+<h2>7. Reporting & Interpretability</h2>
+<ul>
+  <li><strong>Per-task breakdown</strong>, not just aggregate scores.</li>
+  <li><strong>Statistical significance</strong> testing between models.</li>
+  <li><strong>Error analysis support:</strong> Inspect why a model failed.</li>
+  <li><strong>Comparability:</strong> Standardized metrics across models and runs.</li>
+  <li><strong>Leaderboard transparency:</strong> Methodology and code public; results reproducible.</li>
+</ul>
+
+<h2>8. Maintenance & Governance</h2>
+<ul>
+  <li><strong>Active development:</strong> Recent commits, issue responsiveness, release cadence.</li>
+  <li><strong>Versioning:</strong> Task/dataset versions pinned for cross-time reproducibility.</li>
+  <li><strong>Community & adoption:</strong> Citations, dependent projects, leaderboard usage.</li>
+  <li><strong>Documentation quality:</strong> Quickstart, API reference, examples.</li>
+  <li><strong>License:</strong> Permissive (Apache/MIT) preferred for downstream use.</li>
+</ul>
+
+<h2>9. Agent-Specific (Beer-Game Relevant)</h2>
+<ul>
+  <li><strong>Multi-turn support:</strong> Persistent state across turns.</li>
+  <li><strong>Tool-use protocol:</strong> Function calling, MCP, custom action spaces.</li>
+  <li><strong>Environment fidelity:</strong> Realistic state, partial observability, delays.</li>
+  <li><strong>Trajectory scoring:</strong> Evaluate reasoning quality and decision sequences, not just final answer.</li>
+  <li><strong>Replayability:</strong> Deterministic environments for re-running and debugging.</li>
+</ul>
+
+<h2>Composite Scoring</h2>
+<p>Grade each axis 1–5 and weight by use case.</p>
+<table>
+  <thead>
+    <tr>
+      <th>Axis</th>
+      <th>Research</th>
+      <th>Production</th>
+      <th>Beer-Game (Local Models)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Validity</td><td>High</td><td>High</td><td>High</td></tr>
+    <tr><td>Reliability</td><td>High</td><td>High</td><td>High</td></tr>
+    <tr><td>Coverage</td><td>High</td><td>Med</td><td>Med</td></tr>
+    <tr><td>Fairness / Robustness</td><td>High</td><td>Med</td><td>Med</td></tr>
+    <tr><td>Tooling quality</td><td>Med</td><td>High</td><td><strong class="hilite">High</strong></td></tr>
+    <tr><td>Cost & speed</td><td>Low</td><td>High</td><td><strong class="hilite">High</strong></td></tr>
+    <tr><td>Reporting</td><td>High</td><td>Med</td><td>Med</td></tr>
+    <tr><td>Maintenance</td><td>Med</td><td>High</td><td>Med</td></tr>
+    <tr><td>Agent support</td><td>Varies</td><td>Varies</td><td><strong class="hilite">High</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>Application to the Beer-Game Tool</h2>
+<p>Priority axes given the use case (benchmarking local models on strategic, multi-turn decision-making):</p>
+<ol>
+  <li><strong>Agent support</strong> — multi-turn, stateful, partial observability are core to the beer game.</li>
+  <li><strong>Tooling quality</strong> — easy integration with Ollama, llama.cpp, vLLM, OpenAI-compatible endpoints.</li>
+  <li><strong>Cost & speed</strong> — local inference is slow; batching, caching, and resumability matter.</li>
+  <li><strong>Reliability</strong> — deterministic demand patterns, fixed seeds, reproducible runs.</li>
+  <li><strong>Validity</strong> — vary demand scenarios to resist memorization; measure bullwhip amplification, total cost, cost variance.</li>
+  <li><strong>Reporting</strong> — per-position breakdown (retailer/wholesaler/distributor/factory), trajectory traces, cost decomposition.</li>
+</ol>
+
+</body>
+</html>

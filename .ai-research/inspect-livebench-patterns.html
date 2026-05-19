@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Inspect AI & LiveBench — Implementation Patterns</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #666;
+    --bg: #ffffff;
+    --accent: #2563eb;
+    --border: #e5e5e5;
+    --code-bg: #f6f6f6;
+    --pro: #16a34a;
+    --con: #dc2626;
+    --warn: #d97706;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    max-width: 820px;
+    margin: 3rem auto;
+    padding: 0 1.5rem;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  h1 { font-size: 1.75rem; font-weight: 600; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; margin: 2.25rem 0 0.75rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.4rem; }
+  p, ul, ol { margin: 0.5rem 0; }
+  ul li, ol li { margin: 0.3rem 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.88em; }
+  pre { background: var(--code-bg); padding: 0.75rem 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.82rem; line-height: 1.45; }
+  .lede { color: var(--muted); margin-bottom: 1.5rem; }
+  .verdict { background: var(--code-bg); border-left: 3px solid var(--accent); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 3px; }
+  .badge { display: inline-block; font-size: 0.78rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 3px; }
+  .b-yes { background: #dcfce7; color: var(--pro); }
+  .b-partial { background: #fef3c7; color: var(--warn); }
+  .b-no { background: #fee2e2; color: var(--con); }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 600; background: var(--code-bg); }
+  .card { border: 1px solid var(--border); border-radius: 5px; padding: 0.75rem 1rem; margin: 0.75rem 0; background: #fafafa; }
+  .card h3 { margin-top: 0; }
+  .insp { border-left: 3px solid #6366f1; }
+  .live { border-left: 3px solid #14b8a6; }
+</style>
+</head>
+<body>
+
+<h1>Inspect AI & LiveBench — Implementation Patterns</h1>
+<p class="lede">How two more references handle the 8 improvement areas. Comparing against AgentBench to identify the best patterns to borrow.</p>
+
+<h2>Headline Findings</h2>
+<div class="verdict">
+<strong>Inspect AI is the gold standard</strong> for observability, statistical rigor, metric extensibility, and caching. It beats AgentBench on every observability axis. <strong>LiveBench's signature contribution</strong> is the release-date gating mechanism — questions have <code>livebench_release_date</code> and <code>livebench_removal_date</code> fields and are filtered at load time. Surprisingly simple, surprisingly effective.
+</div>
+
+<h2>Comparison Across All Three References</h2>
+<table>
+  <thead><tr><th>Area</th><th>AgentBench</th><th>Inspect AI</th><th>LiveBench</th><th>Best to Borrow</th></tr></thead>
+  <tbody>
+    <tr><td>Data architecture</td>
+      <td><span class="badge b-partial">JSONL</span></td>
+      <td><span class="badge b-yes">.eval ZIP + JSON, EvalSpec manifest, git SHA</span></td>
+      <td><span class="badge b-partial">JSONL + CSV</span></td>
+      <td><strong>Inspect AI</strong></td></tr>
+    <tr><td>Telemetry</td>
+      <td><span class="badge b-no">timestamps only</span></td>
+      <td><span class="badge b-yes">tokens, time, cost, cache hits</span></td>
+      <td><span class="badge b-partial">tokens + tstamp, no latency</span></td>
+      <td><strong>Inspect AI</strong></td></tr>
+    <tr><td>Procedural scenarios</td>
+      <td><span class="badge b-no">none</span></td>
+      <td><span class="badge b-partial">RecordToSample, but no generation</span></td>
+      <td><span class="badge b-yes">release-date gating + monthly refresh</span></td>
+      <td><strong>LiveBench</strong></td></tr>
+    <tr><td>K-run variance</td>
+      <td><span class="badge b-no">none</span></td>
+      <td><span class="badge b-yes">epochs + reducers (mean/std/stderr/bootstrap)</span></td>
+      <td><span class="badge b-partial">variance-check script, not in main flow</span></td>
+      <td><strong>Inspect AI</strong></td></tr>
+    <tr><td>First-class metrics</td>
+      <td><span class="badge b-no">per-task adhoc</span></td>
+      <td><span class="badge b-yes"><code>@metric</code> registry</span></td>
+      <td><span class="badge b-no">per-task if/elif dispatcher</span></td>
+      <td><strong>Inspect AI</strong></td></tr>
+    <tr><td>Robust parsing</td>
+      <td><span class="badge b-partial">inject-error pattern</span></td>
+      <td><span class="badge b-partial">separate regex / model-graded scorers</span></td>
+      <td><span class="badge b-yes">multi-format fallback per task</span></td>
+      <td><strong>LiveBench</strong></td></tr>
+    <tr><td>Resume / caching</td>
+      <td><span class="badge b-yes">replay runs.jsonl</span></td>
+      <td><span class="badge b-yes">log resume + file response cache (config+msgs key)</span></td>
+      <td><span class="badge b-yes"><code>--resume</code>, filter by existing answers</span></td>
+      <td><strong>Inspect AI</strong> (response cache)</td></tr>
+    <tr><td>Declarative config</td>
+      <td><span class="badge b-yes">YAML import/default/overwrite</span></td>
+      <td><span class="badge b-partial">Python decorators + CLI</span></td>
+      <td><span class="badge b-partial">YAML model configs + CLI</span></td>
+      <td><strong>AgentBench</strong> (shape) + <strong>LiveBench</strong> (model YAML)</td></tr>
+  </tbody>
+</table>
+
+<h2>Inspect AI — Standout Patterns to Steal</h2>
+
+<div class="card insp">
+<h3>1. EvalSpec manifest with full provenance</h3>
+<p>Every run captures: <code>eval_set_id</code>, <code>run_id</code>, <code>task_version</code>, <code>task_args</code>, model + generate config, dataset, scorers, metrics, sandbox config, packages, and git revision (<code>type, origin, commit, dirty</code>). All in one structured object. (<code>src/inspect_ai/_eval/task/log.py:186-224</code>, <code>:66-72</code>)</p>
+<p><strong>Why it matters:</strong> a result file can answer "what produced this number?" without referring to anything outside the file.</p>
+</div>
+
+<div class="card insp">
+<h3>2. Telemetry baked into the model wrapper</h3>
+<p><code>ModelUsage</code> tracks <code>input_tokens</code>, <code>output_tokens</code>, <code>total_tokens</code>, <code>cache_read</code>, <code>cache_write</code>, <code>reasoning_tokens</code>, <code>total_cost</code>. <code>ModelOutput.time</code> and <code>ModelCall.time</code> store per-call latency. <code>record_and_check_model_usage()</code> + <code>emit_model_usage()</code> fire after every generate. (<code>src/inspect_ai/model/_model_output.py:14-41,161-166</code>, <code>_model.py:1175-1186</code>)</p>
+<p><strong>Lesson:</strong> wrap the model client once, get telemetry everywhere for free. Don't sprinkle timing code in task implementations.</p>
+</div>
+
+<div class="card insp">
+<h3>3. Epochs + reducers as a first-class concept</h3>
+<p><code>EvalConfig.epochs</code> defaults to 1; <code>epochs_reducer</code> defaults to <code>["mean"]</code>. Available reducers: <code>mean</code>, <code>stderr</code>, <code>std</code>, <code>var</code>, <code>bootstrap_stderr</code>, <code>grouped</code>. <code>total_samples = dataset_samples × epochs</code>. (<code>src/inspect_ai/log/_log.py:62-87,694-703</code>, <code>scorer/_metrics/__init__.py</code>)</p>
+<p><strong>Lesson:</strong> this is exactly the "k-run variance" pattern from our improvement plan, productized. Bootstrap stderr out of the box.</p>
+</div>
+
+<div class="card insp">
+<h3>4. Metric registry via <code>@metric</code> decorator</h3>
+<pre>@metric
+def bullwhip_amplification():
+    def compute(scores: list[SampleScore]) -> float: ...
+    return compute</pre>
+<p>Registered via <code>registry_add(metric, RegistryInfo(type="metric", name=...))</code>. Referenced in logs as <code>MetricSpec(metric=..., args=...)</code>. (<code>src/inspect_ai/scorer/_metric.py:304-436</code>)</p>
+<p><strong>Lesson:</strong> a custom metric is one decorated function. No core changes. This is the right pattern for our bullwhip / recovery-time / parse-rate metrics.</p>
+</div>
+
+<div class="card insp">
+<h3>5. File-based response cache with composite key</h3>
+<p>Cache key includes: <code>config</code>, serialized input messages (excluding message <code>id</code>), <code>base_url</code>, <code>tool_choice</code>, <code>tools</code>, expiry, scopes, and optionally <code>epoch</code>. Stored under <code>cache_path(model=...) / entry.key</code>. (<code>src/inspect_ai/model/_cache.py:139-171,196-243</code>)</p>
+<p><strong>Lesson:</strong> response-level caching (not just sample-level) means re-scoring or re-aggregating doesn't re-query the model. Massive cost savings for local-model iteration. Per-epoch separation prevents accidental cross-epoch sharing.</p>
+</div>
+
+<h2>LiveBench — Standout Patterns to Steal</h2>
+
+<div class="card live">
+<h3>1. Release-date gating (the big one)</h3>
+<p>Every question has <code>livebench_release_date</code> and optionally <code>livebench_removal_date</code>. <code>load_questions()</code> filters by the active release in <code>LIVE_BENCH_RELEASES</code>. Old questions are retired by setting their removal date. (<code>common.py:74,177-235,225-231</code>)</p>
+<pre># Effectively:
+questions = [q for q in all_questions
+             if q.release_date &lt;= active_release
+             and (q.removal_date is None or q.removal_date &gt; active_release)]</pre>
+<p><strong>Why brilliant:</strong> contamination resistance without procedural generation. You just maintain a calendar of scenario releases and retirements. Versionable, reproducible (pin a release), and you can A/B test "did the model get better, or did the questions get harder?"</p>
+<p><strong>For us:</strong> tag each beer-game scenario with a release date. Pin <code>active_release = "2026-Q1"</code> for a given leaderboard. Add new scenarios over time. Retire ones that get memorized.</p>
+</div>
+
+<div class="card live">
+<h3>2. Multi-strategy parsing per task</h3>
+<p>Connections task tries <code>&lt;solution&gt;...&lt;/solution&gt;</code>, then <code>\boxed{}</code>, then legacy bold format (<code>connections/utils.py:48-103</code>). Zebra puzzle tries the same plus a last-line fallback (<code>zebra_puzzle/utils.py:60-87</code>).</p>
+<p><strong>Lesson:</strong> the pattern is "try formats in order of preference; first match wins." For us this would be: strict integer parse → integer-in-last-line → first integer anywhere → JSON-mode field. Track which strategy succeeded so we can measure parse robustness per model.</p>
+</div>
+
+<div class="card live">
+<h3>3. Programmatic verification over LLM-as-judge</h3>
+<p>README quote: objective answers are used <em>"without the use of an LLM judge."</em> Scoring is dispatched per-task to deterministic functions (<code>gen_ground_truth_judgment.py:91-205</code>).</p>
+<p><strong>Lesson:</strong> matches our beer-game advantage. Don't drift toward LLM-as-judge unless absolutely necessary.</p>
+</div>
+
+<div class="card live">
+<h3>4. Variance checker as a separate utility</h3>
+<p><code>check_question_variance.py</code> runs N iterations per model, counts variant answers/scores. It is <em>not</em> part of the main benchmark flow. (<code>check_question_variance.py:15-16,195-247</code>)</p>
+<p><strong>Lesson (anti-pattern):</strong> they treat variance as an afterthought, separate from the leaderboard. Inspect AI's "epochs are first-class" approach is materially better. Don't repeat LiveBench's split here.</p>
+</div>
+
+<div class="card live">
+<h3>5. YAML model configs</h3>
+<p>Models defined as <code>livebench/model/model_configs/*.yaml</code>, loaded via <code>ModelConfig</code> (<code>api_model_config.py:8-37</code>). Override at CLI with <code>--api-base</code>, <code>--api-key</code>, <code>--max-tokens</code>, <code>--force-temperature</code>, <code>--num-choices</code>.</p>
+<p><strong>Lesson:</strong> good shape for declarative model definitions — one YAML per model, CLI flags for run-time overrides. Combine with AgentBench's import/default/overwrite for the full picture.</p>
+</div>
+
+<h2>Synthesis: The Best-Of-Three Architecture for Beer-Game</h2>
+<table>
+  <thead><tr><th>Component</th><th>Pattern</th><th>Source</th></tr></thead>
+  <tbody>
+    <tr><td>Result storage</td><td>SQLite per run + manifest with git SHA, model config, prompt version, scenario set version</td><td>Inspect AI (EvalSpec)</td></tr>
+    <tr><td>Telemetry</td><td>Single model-client wrapper records latency, tokens, context%, parse status into <code>decisions</code> table</td><td>Inspect AI (ModelUsage)</td></tr>
+    <tr><td>Scenario freshness</td><td>Each scenario tagged with <code>release_date</code> / <code>removal_date</code>; runs pin a release version</td><td>LiveBench (release gating)</td></tr>
+    <tr><td>Variance</td><td>First-class <code>epochs</code> in config; built-in reducers including <code>bootstrap_stderr</code></td><td>Inspect AI (epochs + reducers)</td></tr>
+    <tr><td>Metrics</td><td><code>@metric</code> decorator registry; bullwhip, cost, recovery-time, parse-rate all pluggable</td><td>Inspect AI (@metric)</td></tr>
+    <tr><td>Decision parsing</td><td>Ordered strategy chain: strict int → regex last-line → JSON field → fail. Track strategy used per call.</td><td>LiveBench (fallback chain)</td></tr>
+    <tr><td>Response cache</td><td>File-based, keyed on <code>(model, config, prompt, scenario, seed, epoch)</code></td><td>Inspect AI (composite cache key)</td></tr>
+    <tr><td>Run config</td><td>YAML with import/default/overwrite; one YAML per model in <code>configs/models/</code></td><td>AgentBench (composition) + LiveBench (model files)</td></tr>
+  </tbody>
+</table>
+
+<h2>Implication for Our Plan</h2>
+<p>The improvement plan stands and gets sharper:</p>
+<ul>
+  <li><strong>The bullwhip metric becomes a one-decorator addition</strong> if we adopt the <code>@metric</code> pattern. Item 5 in the plan is small once items 1–2 are in place.</li>
+  <li><strong>Procedural scenarios may be overkill at first.</strong> LiveBench shows you can buy most of the contamination-resistance win with release-date gating alone — much cheaper to implement. Procedural generation can be phase 2.</li>
+  <li><strong>K-run variance is solved upstream.</strong> Don't reinvent epochs + reducers; that pattern is mature.</li>
+  <li><strong>Response caching is more valuable than I previously credited.</strong> For local-model iteration on a slow box, caching individual LLM responses by composite key (not just completed games) saves hours.</li>
+</ul>
+
+<h2>Revised "First Sprint"</h2>
+<ol>
+  <li><strong>SQLite schema</strong> with <code>manifest</code>, <code>scenarios</code>, <code>games</code>, <code>decisions</code>, <code>states</code>, <code>metrics</code>. Manifest captures git SHA, prompt version, scenario release.</li>
+  <li><strong>Wrap LLM client</strong> for telemetry — latency, tokens, context%, parse strategy. Borrow Inspect AI's <code>ModelUsage</code> shape.</li>
+  <li><strong>Release-date tagging</strong> on scenarios — even with one scenario today, structurally support <code>release_date</code> + <code>removal_date</code>. Borrow from LiveBench.</li>
+  <li><strong>Metric registry</strong> — even a tiny decorator-based one. Implement <code>cost</code>, <code>bullwhip</code>, <code>recovery_time</code>, <code>parse_rate</code> as the first four. Borrow from Inspect AI.</li>
+  <li><strong>Multi-strategy parser</strong> with ordered fallbacks, strategy tracking. Borrow from LiveBench.</li>
+  <li><em>Then</em> procedural scenarios, k-run epochs, response cache. These build on the foundation.</li>
+</ol>
+
+</body>
+</html>
