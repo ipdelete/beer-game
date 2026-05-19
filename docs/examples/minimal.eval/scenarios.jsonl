@@ -1,0 +1,1 @@
+{"scenario_id":"step_4_8_1w","demand_pattern":"step","params":{"low":4,"high":8,"step_week":5},"weeks":1,"costs":{"holding":0.5,"backlog":1.0},"scenario_seed":42,"release_date":"2026-Q2","removal_date":null}
