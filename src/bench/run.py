@@ -17,6 +17,7 @@ from src.bench.bundle import (
     stable_hash_int,
     utc_now,
 )
+from src.bench.telemetry import configure_telemetry, decision_context
 from src.engine.simulation import BeerGameEngine
 from src.engine.state import PlayerView
 from src.gabm.agent import DEFAULT_ENDPOINT, DEFAULT_MODEL
@@ -82,6 +83,7 @@ def run_bundle(
     demand_seed = stable_hash_int((run_seed, scenario["scenario_id"], SCENARIO_SEED, 0))
     llm_seed = stable_hash_int((run_seed, scenario["scenario_id"], model["id"], 0))
 
+    telemetry_session = configure_telemetry(writer) if mode == "gabm" else None
     decision_rows: list[dict] = []
 
     def record_decision(view: PlayerView, decision: int) -> None:
@@ -118,7 +120,18 @@ def run_bundle(
             }
         )
 
-    decision_fn = _decision_fn(mode, record_decision)
+    decision_fn = _decision_fn(
+        mode,
+        record_decision,
+        {
+            "run_id": writer.run_id,
+            "game_id": game_id,
+            "scenario_id": scenario["scenario_id"],
+            "scenario_release": ACTIVE_RELEASE,
+            "epoch": 0,
+            "llm_seed": llm_seed,
+        },
+    )
     engine = BeerGameEngine(decision_fn=decision_fn)
 
     started = time.monotonic()
@@ -130,12 +143,17 @@ def run_bundle(
     except Exception as exc:
         status = "error"
         error = f"{type(exc).__name__}: {exc}"
+        if telemetry_session is not None:
+            telemetry_session.shutdown()
         raise
     finally:
         wall_seconds = time.monotonic() - started
 
     ended_at = utc_now()
-    writer.append_decisions(decision_rows)
+    if telemetry_session is not None:
+        telemetry_session.shutdown()
+    else:
+        writer.append_decisions(decision_rows)
     writer.append_states(_state_rows(writer.run_id, game_id, engine))
     writer.append_game(
         {
@@ -161,7 +179,9 @@ def run_bundle(
 
 
 def _decision_fn(
-    mode: str, record_decision: Callable[[PlayerView, int], None]
+    mode: str,
+    record_decision: Callable[[PlayerView, int], None],
+    telemetry_fields: dict,
 ) -> Callable[[PlayerView], int]:
     if mode == "mechanistic":
         reset_mech()
@@ -171,6 +191,17 @@ def _decision_fn(
         base_decision = gabm_decision
 
     def decide(view: PlayerView) -> int:
+        if mode == "gabm":
+            with decision_context(
+                **telemetry_fields,
+                week=view.week,
+                role=_role_name(view.role),
+                cache_hit=False,
+                context_used=None,
+                context_window=None,
+            ):
+                return max(0, int(base_decision(view)))
+
         decision = max(0, int(base_decision(view)))
         record_decision(view, decision)
         return decision
