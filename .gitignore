@@ -197,3 +197,4 @@ cython_debug/
 *.csv
 *.png
 tournament_results/
+runs/

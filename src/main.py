@@ -6,6 +6,12 @@ exports the per-week history to CSV for `scripts/plot_results.py`.
 """
 
 import argparse
+import sys
+from pathlib import Path
+
+_repo_root = Path(__file__).resolve().parent.parent
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
 
 from src.engine.simulation import BeerGameEngine
 from src.engine.exporter import export_simulation_results
