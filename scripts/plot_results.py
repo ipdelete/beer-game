@@ -11,7 +11,7 @@ except ImportError:
 import argparse
 
 
-def plot_results(files):
+def plot_results(files, output):
     plt.figure(figsize=(14, 10))
 
     roles = ["Retailer", "Wholesaler", "Distributor", "Factory"]
@@ -38,13 +38,18 @@ def plot_results(files):
             plt.legend()
 
     plt.tight_layout()
-    plt.savefig("bullwhip_comparison.png")
-    print("Visualization saved to bullwhip_comparison.png")
+    plt.savefig(output)
+    print(f"Visualization saved to {output}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("files", nargs="+", help="CSV files to compare")
+    parser.add_argument(
+        "--output",
+        default="bullwhip_comparison.png",
+        help="Path for the generated comparison plot",
+    )
     args = parser.parse_args()
 
-    plot_results(args.files)
+    plot_results(args.files, args.output)

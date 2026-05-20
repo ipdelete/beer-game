@@ -9,15 +9,10 @@ quantitative benchmark for local language models running under Ollama.
 
 ## Documents
 
-- **[Benchmark findings](./benchmark-findings.md)** — the main writeup:
-  motivation, hardware, methodology, 5-model leaderboard, limitations,
-  and a GABM / AutoGen appendix.
 - **[Bundle schema](./bundle.md)** — the `.eval` artifact contract for
   manifest, JSONL, Parquet, seeds, and DuckDB queries.
-- **[Tournament summary](./tournament_summary.md)** — raw leaderboard
-  table for quick reference.
 
-## Leaderboard snapshot
+## Historical leaderboard snapshot
 
 | Rank | Model                  | Total cost (36-wk) |
 |-----:|------------------------|-------------------:|
@@ -39,9 +34,7 @@ Reference: Sterman anchor-and-adjust (rule-based) = **$3,128**;
 Listed separately because it runs on a different inference engine
 (`ds4-server`, not Ollama), is a substantially larger model than the
 Ollama cohort, and benefits from KV-prefix reuse across the growing
-per-role transcripts. It also beats the Sterman baseline. See
-[Benchmark findings — Appendix C](./benchmark-findings.md#appendix-c--non-ollama-reference-run-deepseek-v4-flash-on-ds4)
-for the methodology caveats.
+per-role transcripts. It also beats the Sterman baseline.
 
 ## Source
 

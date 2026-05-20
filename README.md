@@ -14,19 +14,24 @@ To compare the rule-based (mechanistic) approach with the Generative Agent-Based
 
 1. **Run Mechanistic Simulation:**
    ```bash
-   export PYTHONPATH=$PYTHONPATH:. && uv run src/main.py --mode mechanistic --output results_mech.csv
+   mkdir -p /tmp/beer-game-comparison
+   uv run src/main.py --mode mechanistic --output /tmp/beer-game-comparison/results_mech.csv
    ```
 
 2. **Run GABM Simulation** (ensure Ollama is running):
    ```bash
-   export LLM_ENDPOINT="http://localhost:11434/v1" && export LLM_MODEL="mistral:latest" && export PYTHONPATH=$PYTHONPATH:. && uv run src/main.py --mode gabm --output results_gabm.csv
+   LLM_ENDPOINT="http://localhost:11434/v1" LLM_MODEL="mistral:latest" \
+     uv run src/main.py --mode gabm --output /tmp/beer-game-comparison/results_gabm.csv
    ```
 
 3. **Visualize Comparison:**
    ```bash
-   uv run scripts/plot_results.py results_mech.csv results_gabm.csv
+   uv run scripts/plot_results.py \
+     /tmp/beer-game-comparison/results_mech.csv \
+     /tmp/beer-game-comparison/results_gabm.csv \
+     --output /tmp/beer-game-comparison/bullwhip_comparison.png
    ```
-   This will generate a `bullwhip_comparison.png` file showing the behavioral differences.
+   This will generate a comparison plot under `/tmp/beer-game-comparison/`.
 
 ## Adding ds4 (DeepSeek V4 Flash) as a Target
 
@@ -53,8 +58,7 @@ GABM agent can drive it without code changes — only env vars.
    ```bash
    export LLM_ENDPOINT="http://localhost:8000/v1"
    export LLM_MODEL="deepseek-v4-flash"
-   export PYTHONPATH=$PYTHONPATH:.
-   uv run src/main.py --mode gabm --output results_ds4.csv
+   uv run src/main.py --mode gabm --output /tmp/beer-game-comparison/results_ds4.csv
    ```
 
 4. **Run the tournament against ds4** (uses `scripts/tournament-ds4.sh`,
@@ -82,4 +86,3 @@ latency and final game cost are the more interpretable signals.
 ds4 defaults to thinking mode. The GABM agent already strips
 `</think>` blocks and the OpenAI `reasoning` field when extracting the
 integer order, so no parser change is needed.
-
