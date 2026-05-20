@@ -70,6 +70,13 @@ future reducers. The built-in metrics are:
 | `parse_success_rate` | Fraction of decision rows where `parse_ok` is true. | `NULL` parse flags count as failures; `None` for empty decision views. |
 | `recovery_time` | Mean elapsed weeks from a step demand shock until system pressure stabilizes. | Only step scenarios are considered; `None` if no game recovers. |
 
+GABM responses are parsed by an ordered fallback chain in `src.bench.parser`.
+The parser tries strict integers first, then structured wrappers such as JSON,
+boxed answers, and answer tags, before falling back to integers on the final line
+or anywhere in the response. Each decision records both `parse_ok` and
+`parse_strategy`, and `bench report` prints a per-model parse-strategy histogram
+so chatty or poorly formatted models are visible instead of silently hidden.
+
 Runs can repeat the same scenario/model pair across epochs:
 
 ```bash

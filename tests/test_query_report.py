@@ -60,6 +60,9 @@ def test_report_prints_summary_tokens_and_latency(capsys, tmp_path):
     assert "10" in output
     assert "Latency by role (model: test-model, mean / p95 in ms)" in output
     assert "102" in output
+    assert "Parse strategies (model: test-model)" in output
+    assert "strict_int" in output
+    assert "100.0%" in output
     assert "Metrics" in output
     assert "total_cost" in output
 
@@ -71,6 +74,7 @@ def test_report_handles_null_token_and_latency_columns(capsys):
     assert "Tokens by role (model: example-model)" in output
     assert "n/a" in output
     assert "Latency by role (model: example-model, mean / p95 in ms)" in output
+    assert "Parse strategies" in output
 
 
 def test_report_prints_reduced_metrics_for_multiple_epochs(capsys, tmp_path):

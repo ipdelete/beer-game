@@ -9,13 +9,13 @@ bullwhip effect in novice human players.
 from __future__ import annotations
 
 import os
-import re
 from typing import Dict, List
 
 from opentelemetry.trace import SpanKind, Status, StatusCode
 from openai import OpenAI
 
 from ..bench import telemetry
+from ..bench.parser import max_plausible_order_from_env, parse_decision
 from ..engine.state import PlayerRecord, PlayerView
 
 DEFAULT_ENDPOINT = "http://localhost:11434/v1"
@@ -94,6 +94,7 @@ class GABMAgent:
         self.model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
         self.client = OpenAI(base_url=self.endpoint, api_key="ollama")
         self.system_prompt = _system_prompt(role)
+        self.max_plausible_order = max_plausible_order_from_env()
 
     def decide(self, view: PlayerView) -> int:
         tracer = telemetry.get_tracer()
@@ -131,9 +132,13 @@ class GABMAgent:
                 reasoning = (
                     (getattr(msg, "reasoning", None) or "").strip() if msg else ""
                 )
-                decision, parse_ok, parse_strategy = _parse_order(content, reasoning)
-                _set_if(span, "beergame.parse_ok", parse_ok)
-                _set_if(span, "beergame.parse_strategy", parse_strategy)
+                result = parse_decision(
+                    _answer_region(content, reasoning),
+                    max_plausible_order=self.max_plausible_order,
+                )
+                decision = result.value if result.ok and result.value is not None else 0
+                _set_if(span, "beergame.parse_ok", result.ok)
+                _set_if(span, "beergame.parse_strategy", result.strategy)
                 _set_if(span, "beergame.decision_int", decision)
                 return decision
             except Exception as e:  # pragma: no cover - network error path
@@ -227,22 +232,12 @@ def _first_finish_reason(response) -> str | None:
     return getattr(choices[0], "finish_reason", None)
 
 
-def _parse_order(content: str, reasoning: str) -> tuple[int, bool, str]:
-    # Strategy: isolate the model's final answer, which follows any reasoning.
+def _answer_region(content: str, reasoning: str) -> str:
     if content:
         if "</think>" in content:
-            answer_region = content.rsplit("</think>", 1)[-1]
-            matches = re.findall(r"-?\d+", answer_region)
-            if matches:
-                return max(0, int(matches[0])), True, "after_think_first_int"
-        matches = re.findall(r"-?\d+", content)
-        if matches:
-            return max(0, int(matches[0])), True, "first_int"
-    if reasoning:
-        matches = re.findall(r"-?\d+", reasoning)
-        if matches:
-            return max(0, int(matches[-1])), True, "reasoning_last_int"
-    return 0, False, "failed"
+            return content.rsplit("</think>", 1)[-1]
+        return content
+    return reasoning
 
 
 _AGENTS: Dict[str, GABMAgent] = {}
