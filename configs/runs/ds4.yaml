@@ -1,7 +1,7 @@
 import: "../default.yaml"
 
 weeks: 36
-epochs: 3
+epochs: 1
 mode: gabm
 
 _list_policy:

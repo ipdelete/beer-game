@@ -1,7 +1,7 @@
 import: "../default.yaml"
 
 weeks: 36
-epochs: 3
+epochs: 1
 mode: mechanistic
 
 _list_policy:
