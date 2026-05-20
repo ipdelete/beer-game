@@ -6,13 +6,16 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 import pytest
+import duckdb
 
 from bench.metrics import total_cost as compat_total_cost
 from src.bench.bundle import BundleWriter, ROLE_NAMES
 from src.bench.metrics import (
     bullwhip_ratio,
     list_metrics,
+    metric_epoch_values,
     parse_success_rate,
+    run_metric_reducers,
     recovery_time,
     run_metrics,
     total_cost,
@@ -82,6 +85,25 @@ def test_total_cost_sums_state_cost_rows(tmp_path):
     assert total_cost(con) == pytest.approx(48.0)
 
 
+def test_metric_reducers_run_against_each_epoch(tmp_path):
+    first_bundle = _write_metric_bundle(tmp_path, "epoch-zero")
+    second_bundle = _write_metric_bundle(
+        tmp_path / "second",
+        "epoch-one",
+        factory_orders=[4, 4, 16, 0, 16, 0, 16, 0, 16, 0, 16, 0],
+    )
+
+    con = _merged_epoch_connection(first_bundle, second_bundle)
+
+    assert metric_epoch_values(con, "total_cost") == [48.0, 48.0]
+    reduced = run_metric_reducers(con)
+    assert reduced["total_cost"].value == pytest.approx(48.0)
+    assert reduced["total_cost"].error == pytest.approx(0.0)
+    assert reduced["total_cost"].n == 2
+    assert reduced["bullwhip_ratio"].values[0] == pytest.approx(1.0)
+    assert reduced["bullwhip_ratio"].values[1] > 1.0
+
+
 def _write_metric_bundle(
     tmp_path: Path,
     run_id: str,
@@ -145,6 +167,33 @@ def _write_metric_bundle(
         _state_rows(run_id, game_id, customer_demand, factory_orders, pressure)
     )
     return writer.finish()
+
+
+def _merged_epoch_connection(first_bundle: Path, second_bundle: Path):
+    first = open_bundle(first_bundle)
+    second = open_bundle(second_bundle)
+    con = duckdb.connect()
+    for view_name in ("manifest", "scenarios", "games", "decisions", "states"):
+        first_table = first.execute(f"SELECT * FROM {view_name}").to_arrow_table()
+        second_table = second.execute(
+            f"""
+            SELECT * REPLACE (1 AS epoch)
+            FROM {view_name}
+            """
+            if view_name in {"games", "decisions"}
+            else f"SELECT * FROM {view_name}"
+        ).to_arrow_table()
+        con.register("first_table", first_table)
+        con.register("second_table", second_table)
+        con.execute(f"""
+            CREATE TABLE {view_name} AS
+            SELECT * FROM first_table
+            UNION ALL BY NAME
+            SELECT * FROM second_table
+            """)
+        con.unregister("first_table")
+        con.unregister("second_table")
+    return con
 
 
 def _decision_rows(run_id: str, game_id: str) -> list[dict]:

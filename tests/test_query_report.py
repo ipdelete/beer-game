@@ -10,6 +10,7 @@ if str(repo_root) not in sys.path:
 from src.bench.bundle import BundleWriter, ROLE_NAMES
 from src.bench.query import open_bundle, open_bundles
 from src.bench.report import main as report_main
+from src.bench.run import run_bundle
 
 EXAMPLE_BUNDLE = Path("docs/examples/minimal.eval")
 
@@ -70,6 +71,17 @@ def test_report_handles_null_token_and_latency_columns(capsys):
     assert "Tokens by role (model: example-model)" in output
     assert "n/a" in output
     assert "Latency by role (model: example-model, mean / p95 in ms)" in output
+
+
+def test_report_prints_reduced_metrics_for_multiple_epochs(capsys, tmp_path):
+    bundle_path = run_bundle(turns=6, root=tmp_path, run_id="epochs", epochs=3)
+
+    report_main([str(bundle_path)])
+
+    output = capsys.readouterr().out
+    assert "Metrics" in output
+    assert "+/-" in output
+    assert "(n=3)" in output
 
 
 def test_module_entrypoint_runs_report():
