@@ -8,7 +8,16 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
+
+from src.bench.scenarios import parse_release
 
 RESERVED_LIST_POLICY = "_list_policy"
 SECRET_KEYS = {"api_key", "authorization", "headers", "token", "secret"}
@@ -23,8 +32,21 @@ class ScenarioConfig(BaseModel):
     weeks: int = Field(gt=0)
     costs: dict[str, float]
     scenario_seed: int
-    release_date: str | None = None
+    release_date: str
     removal_date: str | None = None
+
+    @field_validator("release_date")
+    @classmethod
+    def validate_release_date(cls, value: str) -> str:
+        parse_release(value)
+        return value
+
+    @model_validator(mode="after")
+    def validate_removal_date(self) -> "ScenarioConfig":
+        if self.removal_date is not None:
+            if parse_release(self.removal_date) <= parse_release(self.release_date):
+                raise ValueError("removal_date must be after release_date")
+        return self
 
 
 class ModelConfig(BaseModel):
@@ -70,7 +92,7 @@ class RunConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = "1.0.0"
-    active_release: str = "2026-Q2"
+    active_release: str | None = None
     run_seed: int = 12345
     weeks: int = Field(default=36, gt=0)
     epochs: int = Field(default=1, ge=1)
@@ -80,6 +102,13 @@ class RunConfig(BaseModel):
     scenarios: list[ScenarioConfig] = Field(default_factory=list)
     models: list[ModelConfig] = Field(default_factory=list)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
+
+    @field_validator("active_release")
+    @classmethod
+    def validate_active_release(cls, value: str | None) -> str | None:
+        if value is not None:
+            parse_release(value)
+        return value
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
