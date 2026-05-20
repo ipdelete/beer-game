@@ -6,11 +6,13 @@ and reports.
 
 ## Goals
 
-One run produces one schema-versioned artifact under `runs/`. The v1 artifact
-is a directory so writers can append files without ZIP complexity:
+One run produces one schema-versioned artifact. By default, CLI-generated
+bundles go under `/tmp/beer-game-runs`; pass `--runs-dir`, `--root`, or
+`BEERGAME_RUNS_DIR` when you want a different location. The v1 artifact is a
+directory so writers can append files without ZIP complexity:
 
 ```text
-runs/<run_id>.eval/
+/tmp/beer-game-runs/<run_id>.eval/
   manifest.json
   scenarios.jsonl
   games.jsonl
@@ -31,14 +33,14 @@ Bundles can be opened through the DuckDB helper:
 ```python
 from src.bench.query import open_bundle
 
-con = open_bundle("runs/<run_id>.eval")
+con = open_bundle("/tmp/beer-game-runs/<run_id>.eval")
 con.execute("SELECT count(*) FROM decisions").fetchone()
 ```
 
 For a first plain-text summary, run:
 
 ```bash
-uv run python -m bench.report runs/<run_id>.eval
+uv run python -m bench.report /tmp/beer-game-runs/<run_id>.eval
 ```
 
 The report intentionally uses plain ASCII tables so it works in terminals,
@@ -54,7 +56,7 @@ uv run bench show latest --runs-dir /tmp/beer-game-check
 ```
 
 Bundle arguments can be full `.eval` paths, `latest`, or a unique short prefix
-inside `runs/` or `BEERGAME_RUNS_DIR`. The `compare` command is present as the
+inside `/tmp/beer-game-runs`, `--runs-dir`, or `BEERGAME_RUNS_DIR`. The `compare` command is present as the
 future issue #15 contract and exits non-zero until paired bootstrap significance
 lands.
 
@@ -95,7 +97,7 @@ future reducers. The built-in metrics are:
 Model comparisons use paired bootstrap significance on matrix bundles:
 
 ```bash
-uv run bench compare runs/<run_id>.eval --baseline model-a --challenger model-b --metric total_cost
+uv run bench compare /tmp/beer-game-runs/<run_id>.eval --baseline model-a --challenger model-b --metric total_cost
 ```
 
 Pairs are matched by `(scenario_id, epoch)` and require matching `demand_seed`;
@@ -349,7 +351,7 @@ SELECT
   model,
   avg(total_cost) AS mean_total_cost,
   count(*) AS games
-FROM 'runs/*.eval/games.jsonl'
+FROM '/tmp/beer-game-runs/*.eval/games.jsonl'
 WHERE status = 'ok'
 GROUP BY model
 ORDER BY mean_total_cost;
@@ -362,7 +364,7 @@ SELECT
   role,
   avg(latency_ms) AS mean_latency_ms,
   count(*) AS calls
-FROM 'runs/*.eval/decisions.parquet'
+FROM '/tmp/beer-game-runs/*.eval/decisions.parquet'
 WHERE latency_ms IS NOT NULL
 GROUP BY role
 ORDER BY role;
@@ -373,20 +375,20 @@ Bullwhip computation using `states.customer_demand`:
 ```sql
 WITH demand AS (
   SELECT game_id, stddev_samp(customer_demand) AS demand_std
-  FROM 'runs/*.eval/states.parquet'
+  FROM '/tmp/beer-game-runs/*.eval/states.parquet'
   WHERE role = 'retailer' AND customer_demand IS NOT NULL
   GROUP BY game_id
 ),
 factory_orders AS (
   SELECT game_id, stddev_samp(order_placed) AS factory_order_std
-  FROM 'runs/*.eval/states.parquet'
+  FROM '/tmp/beer-game-runs/*.eval/states.parquet'
   WHERE role = 'factory'
   GROUP BY game_id
 )
 SELECT
   g.model,
   avg(factory_order_std / nullif(demand_std, 0)) AS bullwhip_ratio
-FROM 'runs/*.eval/games.jsonl' AS g
+FROM '/tmp/beer-game-runs/*.eval/games.jsonl' AS g
 JOIN demand USING (game_id)
 JOIN factory_orders USING (game_id)
 WHERE g.status = 'ok'

@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 # Try to import visualization libraries; fail gracefully if missing
 try:
@@ -10,8 +11,12 @@ except ImportError:
 
 import argparse
 
+DEFAULT_OUTPUT = Path("/tmp/beer-game-comparison/bullwhip_comparison.png")
+
 
 def plot_results(files, output):
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
     plt.figure(figsize=(14, 10))
 
     roles = ["Retailer", "Wholesaler", "Distributor", "Factory"]
@@ -47,7 +52,7 @@ if __name__ == "__main__":
     parser.add_argument("files", nargs="+", help="CSV files to compare")
     parser.add_argument(
         "--output",
-        default="bullwhip_comparison.png",
+        default=DEFAULT_OUTPUT,
         help="Path for the generated comparison plot",
     )
     args = parser.parse_args()

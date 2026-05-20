@@ -33,6 +33,7 @@ from src.gabm.agent import GABMAgent, PROMPT_VERSION
 from src.mechanistic.agent import ALPHA_D, BETA, S_INV
 
 ACTIVE_RELEASE = "2026-Q2"
+DEFAULT_RUNS_ROOT = Path("/tmp/beer-game-runs")
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ class GameTask:
 def run_matrix(
     config: dict,
     *,
-    root: Path | str = Path("runs"),
+    root: Path | str = DEFAULT_RUNS_ROOT,
     run_id: str | None = None,
     parallel: int | None = None,
     force: bool = False,

@@ -13,7 +13,9 @@ import click
 def runs_dir(value: str | Path | None = None) -> Path:
     """Resolve the runs directory from CLI option, env var, or default."""
 
-    candidate = value or os.environ.get("BEERGAME_RUNS_DIR") or "runs"
+    candidate = (
+        value or os.environ.get("BEERGAME_RUNS_DIR") or Path("/tmp/beer-game-runs")
+    )
     return Path(candidate).expanduser().resolve()
 
 

@@ -114,6 +114,6 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ## Security and artifacts
 
 - Do not commit secrets, tokens, local `.env` files, or model credentials.
-- Do not commit generated run output under `runs/`.
+- Do not commit generated run output; default it to `/tmp`.
 - Temporary validation artifacts should go under `/tmp` unless the issue asks
   for a checked-in fixture.

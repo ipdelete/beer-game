@@ -14,6 +14,6 @@ set -euo pipefail
 export PROVIDER="${PROVIDER:-ds4}"
 export LLM_ENDPOINT="${LLM_ENDPOINT:-http://localhost:8000/v1}"
 export MODELS="${MODELS:-deepseek-v4-flash}"
-export RESULTS_DIR="${RESULTS_DIR:-tournament_results_ds4}"
+export RESULTS_DIR="${RESULTS_DIR:-/tmp/beer-game-tournament-ds4}"
 
 exec "$(dirname "$0")/tournament.sh" "$@"

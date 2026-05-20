@@ -13,6 +13,7 @@
 #   LLM_ENDPOINT   OpenAI-compatible base URL          (default: Ollama on :11434)
 #   MODELS         space-separated model id list       (default: built-in roster)
 #   TURNS          weeks per game                      (default: 36)
+#   RESULTS_DIR    output directory                    (default: /tmp/beer-game-tournament)
 #
 # Provider-specific behavior:
 #   ollama  -> warms by stopping all loaded models, then lets the run reload.
@@ -40,7 +41,7 @@ else
   MODELS=( "${DEFAULT_MODELS[@]}" )
 fi
 
-RESULTS_DIR="${RESULTS_DIR:-tournament_results}"
+RESULTS_DIR="${RESULTS_DIR:-/tmp/beer-game-tournament}"
 mkdir -p "$RESULTS_DIR"
 SUMMARY="$RESULTS_DIR/summary.tsv"
 printf "model\twall_seconds\ttotal_cost\tretailer\twholesaler\tdistributor\tfactory\n" > "$SUMMARY"

@@ -194,10 +194,11 @@ cython_debug/
 .cursorindexingignore
 
 # Simulation results
-*.csv
-*.png
-tournament_results/
-runs/
+/*.csv
+/*.png
+/tournament_results/
+/tournament_results_*/
+/runs/
 
 # Local browser automation scratch files
 .playwright-cli/
