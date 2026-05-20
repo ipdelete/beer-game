@@ -8,10 +8,14 @@
   <style>
     :root {
       color-scheme: light dark;
-      --border: color-mix(in srgb, CanvasText 18%, transparent);
-      --muted: color-mix(in srgb, CanvasText 58%, transparent);
-      --hover: color-mix(in srgb, Highlight 16%, transparent);
-      --selected: color-mix(in srgb, Highlight 28%, transparent);
+      --background: oklch(0.145 0.008 260);
+      --foreground: oklch(0.985 0 0);
+      --border: oklch(0.25 0.012 260);
+      --muted: oklch(0.708 0.01 260);
+      --panel: oklch(0.195 0.015 260);
+      --panel-strong: oklch(0.255 0.015 260);
+      --hover: oklch(0.255 0.015 260);
+      --selected: oklch(0.32 0.025 260);
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -22,8 +26,8 @@
     body {
       margin: 0;
       min-height: 100vh;
-      background: Canvas;
-      color: CanvasText;
+      background: var(--background);
+      color: var(--foreground);
     }
 
     .app {
@@ -38,7 +42,7 @@
     .pane {
       border: 1px solid var(--border);
       border-radius: 0.75rem;
-      background: color-mix(in srgb, Canvas 96%, CanvasText 4%);
+      background: var(--panel);
     }
 
     header {
@@ -65,8 +69,10 @@
     }
 
     button {
-      border: 1px solid color-mix(in srgb, CanvasText 24%, transparent);
+      background: var(--panel-strong);
+      border: 1px solid var(--border);
       border-radius: 0.5rem;
+      color: var(--foreground);
       cursor: pointer;
       font: inherit;
       padding: 0.45rem 0.7rem;
@@ -86,11 +92,17 @@
     }
 
     input[type="search"] {
+      background: var(--panel-strong);
       border: 1px solid var(--border);
       border-radius: 0.5rem;
+      color: var(--foreground);
       font: inherit;
       min-width: 16rem;
       padding: 0.45rem 0.65rem;
+    }
+
+    input[type="search"]::placeholder {
+      color: var(--muted);
     }
 
     .status,
