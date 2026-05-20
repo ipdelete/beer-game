@@ -103,7 +103,7 @@ def test_report_prints_matrix_for_multi_model_multi_scenario_bundle(capsys, tmp_
 
 def test_module_entrypoint_runs_report():
     result = subprocess.run(
-        [sys.executable, "-m", "bench.report", str(EXAMPLE_BUNDLE)],
+        [sys.executable, "-m", "src.bench.report", str(EXAMPLE_BUNDLE)],
         check=True,
         capture_output=True,
         text=True,

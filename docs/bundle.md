@@ -40,7 +40,7 @@ con.execute("SELECT count(*) FROM decisions").fetchone()
 For a first plain-text summary, run:
 
 ```bash
-uv run python -m bench.report /tmp/beer-game-runs/<run_id>.eval
+uv run python -m src.bench.report /tmp/beer-game-runs/<run_id>.eval
 ```
 
 The report intentionally uses plain ASCII tables so it works in terminals,
@@ -113,7 +113,7 @@ so chatty or poorly formatted models are visible instead of silently hidden.
 Runs can repeat the same scenario/model pair across epochs:
 
 ```bash
-uv run python -m bench.run --mode mechanistic --turns 6 --epochs 5
+uv run python -m src.bench.run --mode mechanistic --turns 6 --epochs 5
 ```
 
 Each epoch writes a separate `games.jsonl` row and carries the epoch number into

@@ -34,7 +34,7 @@ uv run src/main.py
 Run a benchmark bundle:
 
 ```bash
-uv run python -m bench.run --turns 1
+uv run python -m src.bench.run --turns 1
 ```
 
 ## Testing instructions
@@ -57,8 +57,8 @@ For bundle/telemetry changes, also run the real command path and inspect the
 generated `.eval` artifact:
 
 ```bash
-uv run python -m bench.run --mode mechanistic --turns 1 --root /tmp/beer-game-check --run-id check-mech
-uv run python -m bench.run --mode gabm --turns 1 --root /tmp/beer-game-check --run-id check-gabm
+uv run python -m src.bench.run --mode mechanistic --turns 1 --root /tmp/beer-game-check --run-id check-mech
+uv run python -m src.bench.run --mode gabm --turns 1 --root /tmp/beer-game-check --run-id check-gabm
 ```
 
 ## Code style and conventions

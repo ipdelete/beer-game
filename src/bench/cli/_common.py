@@ -16,7 +16,7 @@ def runs_dir(value: str | Path | None = None) -> Path:
     candidate = (
         value or os.environ.get("BEERGAME_RUNS_DIR") or Path("/tmp/beer-game-runs")
     )
-    return Path(candidate).expanduser().resolve()
+    return Path(candidate).expanduser().absolute()
 
 
 def resolve_bundle(value: str | Path, root: str | Path | None = None) -> Path:

@@ -8,7 +8,6 @@ if str(repo_root) not in sys.path:
 import pytest
 import duckdb
 
-from bench.metrics import total_cost as compat_total_cost
 from src.bench.bundle import BundleWriter, ROLE_NAMES
 from src.bench.metrics import (
     bullwhip_ratio,
@@ -36,10 +35,6 @@ def test_metric_registry_lists_sorted_metrics_and_runs_selected(tmp_path):
     assert run_metrics(con, ["total_cost"]) == {"total_cost": total_cost(con)}
     with pytest.raises(KeyError, match="Unknown metrics: nope"):
         run_metrics(con, ["nope"])
-
-
-def test_metrics_are_importable_from_compat_package():
-    assert compat_total_cost is total_cost
 
 
 def test_bullwhip_ratio_is_one_for_matching_order_variance(tmp_path):

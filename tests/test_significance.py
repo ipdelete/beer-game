@@ -9,7 +9,7 @@ repo_root = Path(__file__).parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from bench.cli.main import bench
+from src.bench.cli.main import bench
 from src.bench.bundle import BundleWriter
 from src.bench.metrics import HIGHER_IS_BETTER, LOWER_IS_BETTER, metric_direction
 from src.bench.query import open_bundle

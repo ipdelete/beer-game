@@ -3,8 +3,8 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from bench.cli._common import resolve_bundle
-from bench.cli.main import bench
+from src.bench.cli._common import resolve_bundle
+from src.bench.cli.main import bench
 from src.bench.run import run_bundle
 
 

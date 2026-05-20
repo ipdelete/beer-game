@@ -49,8 +49,8 @@ For code changes, run the relevant existing checks:
 - Full tests: `uv run pytest -q`
 - Black on touched Python files only: `uv run black --fast --check <paths>`
 - For bundle or telemetry changes, also run the real benchmark paths and inspect the generated `.eval` artifact:
-  - `uv run python -m bench.run --mode mechanistic --turns 1 --root /tmp/beer-game-check --run-id check-mech`
-  - `uv run python -m bench.run --mode gabm --turns 1 --root /tmp/beer-game-check --run-id check-gabm`
+  - `uv run python -m src.bench.run --mode mechanistic --turns 1 --root /tmp/beer-game-check --run-id check-mech`
+  - `uv run python -m src.bench.run --mode gabm --turns 1 --root /tmp/beer-game-check --run-id check-gabm`
 
 ## Issue workflow
 
