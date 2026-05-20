@@ -16,7 +16,7 @@ The decision function is pure: `(PlayerView) -> int`. It has no access to
 anything a real player couldn't see.
 """
 
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Sequence
 
 import sys
 from pathlib import Path
@@ -30,7 +30,6 @@ from roles import Retailer, Wholesaler, Distributor, Factory  # noqa: E402
 
 from .state import PlayerRecord, PlayerView  # noqa: E402
 
-
 DecisionFn = Callable[[PlayerView], int]
 
 
@@ -41,11 +40,14 @@ class BeerGameEngine:
         self,
         decision_fn: DecisionFn,
         team_name: str = "Beer Game",
+        customer_demand: Sequence[int] | None = None,
     ):
         self.team_name = team_name
         self.decision_fn = decision_fn
 
         self.retailer = Retailer(team_name)
+        if customer_demand is not None:
+            self.retailer.customer_orders = [int(value) for value in customer_demand]
         self.wholesaler = Wholesaler(team_name)
         self.distributor = Distributor(team_name)
         self.factory = Factory(team_name)
@@ -174,7 +176,9 @@ class BeerGameEngine:
         factory_decision = max(0, int(self.decision_fn(factory_view)))
 
         # Phase 3: execute all roles (advances delays, updates inventory/backlog).
-        self.retailer.execute_week(order_decision=retailer_decision)
+        self.retailer.execute_week(
+            order_decision=retailer_decision, customer_order=customer_order
+        )
         wholesaler_shipped = self.wholesaler.execute_week(
             incoming_order=retailer_out_order_arriving,
             order_decision=wholesaler_decision,

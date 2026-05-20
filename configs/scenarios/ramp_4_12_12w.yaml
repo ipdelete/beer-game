@@ -1,0 +1,14 @@
+scenario_id: ramp_4_12_12w
+demand_pattern: ramp
+params:
+  start: 4
+  end: 12
+  start_week: 3
+  end_week: 10
+weeks: 12
+costs:
+  holding: 0.5
+  backlog: 1.0
+scenario_seed: 101
+release_date: "2026-Q3"
+removal_date: null
