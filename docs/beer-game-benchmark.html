@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Beer Game Benchmark</title>
+  <meta name="description" content="A 90s bowling-alley GeoCities runbook for the Beer Game Benchmark.">
+  <style>
+    :root {
+      --wood: #7f4f24;
+      --lane: #ffdd78;
+      --beer: #ffb703;
+      --neon: #00f5ff;
+      --pink: #ff00cc;
+      --ink: #231609;
+      --paper: #fffaf0;
+      --danger: #d62828;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Comic Sans MS", "Comic Sans", "Trebuchet MS", cursive;
+      background:
+        radial-gradient(circle at 15% 12%, rgba(255,255,255,0.85) 0 7rem, transparent 7.2rem),
+        repeating-linear-gradient(90deg, #2b1205 0 1rem, #120804 1rem 2rem),
+        repeating-linear-gradient(135deg, var(--lane) 0 1.4rem, #f8b84e 1.4rem 2.8rem, #d77b2a 2.8rem 4.2rem, var(--wood) 4.2rem 5.6rem);
+      background-blend-mode: screen, multiply, normal;
+      line-height: 1.6;
+      cursor: crosshair;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle, rgba(255,255,255,0.22) 0 1px, transparent 2px),
+        repeating-linear-gradient(90deg, rgba(39,26,16,0.04) 0 2px, transparent 2px 9px);
+      background-size: 1.3rem 1.3rem, auto;
+      mix-blend-mode: soft-light;
+    }
+
+    .top-marquee,
+    .bottom-marquee {
+      position: fixed;
+      left: 0;
+      right: 0;
+      z-index: 50;
+      padding: 0.35rem 0;
+      color: #ffff00;
+      background: #0000aa;
+      border-block: 4px ridge var(--pink);
+      font-size: 1.05rem;
+      font-weight: 1000;
+      text-shadow: 2px 2px 0 #000;
+    }
+
+    .top-marquee { top: 0; }
+    .bottom-marquee { bottom: 0; }
+
+    a {
+      color: #7a2600;
+      font-weight: 800;
+    }
+
+    .hero {
+      min-height: 92vh;
+      display: grid;
+      place-items: center;
+      padding: 6rem 1.25rem 8rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card {
+      width: min(1120px, 100%);
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 2rem;
+      grid-template-columns: 1.15fr 0.85fr;
+      align-items: center;
+      padding: clamp(1.25rem, 4vw, 3rem);
+      border: 8px ridge #ffff00;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.88), rgba(255,242,0,0.78)),
+        repeating-linear-gradient(45deg, rgba(255,0,204,0.18) 0 1rem, transparent 1rem 2rem);
+      box-shadow: 0 2rem 5rem rgba(32, 17, 4, 0.35), inset 0 0 0 8px rgba(0,245,255,0.55);
+    }
+
+    .kicker {
+      display: inline-flex;
+      padding: 0.4rem 0.75rem;
+      border: 4px outset #fff;
+      background: #000;
+      color: #00ff66;
+      font-size: 0.9rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    h1 {
+      margin: 1rem 0;
+      font-size: clamp(3rem, 9vw, 7.8rem);
+      line-height: 0.88;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      color: #fff;
+      text-shadow: 4px 4px 0 #000, 8px 8px 0 var(--pink), 12px 12px 0 var(--neon);
+    }
+
+    h1 span {
+      display: block;
+      color: #ffff00;
+      animation: blink 0.8s steps(2, start) infinite;
+    }
+
+    .tagline {
+      max-width: 42rem;
+      font-size: clamp(1.25rem, 2.2vw, 1.8rem);
+      font-weight: 800;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.9rem;
+      margin-top: 2rem;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 3.25rem;
+      padding: 0.85rem 1.2rem;
+      border: 3px solid #15110a;
+      border-radius: 0.4rem;
+      color: #000;
+      background: linear-gradient(180deg, #fff, #ff0 45%, #f0c);
+      text-decoration: none;
+      box-shadow: 0 0.45rem 0 #000;
+    }
+
+    .button.secondary {
+      background: linear-gradient(180deg, #0ff, #fff);
+    }
+
+    .stage {
+      min-height: 26rem;
+      display: grid;
+      place-items: center;
+      position: relative;
+      padding: 2rem;
+      border-radius: 1.5rem;
+      background:
+        repeating-radial-gradient(circle at center, #ff0 0 0.45rem, #f0c 0.45rem 0.9rem, #0ff 0.9rem 1.35rem),
+        linear-gradient(160deg, rgba(45,106,79,0.15), rgba(127,79,36,0.24));
+      border: 8px groove var(--neon);
+    }
+
+    .ball {
+      width: min(20rem, 70vw);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 35% 30%, #fff4d6 0 12%, var(--beer) 13% 58%, #fb8500 59% 100%);
+      box-shadow: 0 0 0 1rem rgba(255,183,3,0.22), 0 1.4rem 2.5rem rgba(39,26,16,0.28);
+      transform: rotate(-5deg);
+      font-size: clamp(4rem, 12vw, 7rem);
+      animation: wobble 2.2s ease-in-out infinite;
+    }
+
+    .role {
+      position: absolute;
+      padding: 0.55rem 0.75rem;
+      border: 2px dashed #15110a;
+      border-radius: 0.75rem;
+      background: var(--paper);
+      font-weight: 900;
+      box-shadow: 0 0.6rem 1rem rgba(39,26,16,0.16);
+      animation: floaty 1.5s ease-in-out infinite alternate;
+    }
+
+    .one { top: 9%; left: 6%; transform: rotate(-12deg); }
+    .two { right: 8%; top: 22%; transform: rotate(10deg); }
+    .three { bottom: 10%; left: 18%; transform: rotate(7deg); }
+    .four { bottom: 18%; right: 5%; transform: rotate(-7deg); }
+    .beer { position: absolute; right: 12%; bottom: 5%; font-size: clamp(3rem, 8vw, 5.5rem); }
+
+    main {
+      position: relative;
+      z-index: 2;
+      margin: -4rem auto 0;
+      padding: 0 1rem 4rem;
+      width: min(1120px, 100%);
+    }
+
+    .panel {
+      margin: 1.2rem 0;
+      padding: clamp(1.25rem, 3vw, 2rem);
+      border: 3px solid #15110a;
+      border-radius: 1.5rem;
+      background: var(--paper);
+      box-shadow: 0 0.9rem 0 rgba(39,26,16,0.85);
+    }
+
+    .panel.hot {
+      background: linear-gradient(135deg, #fff4d6, #ffd166);
+    }
+
+    .scene-title {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin: 0 0 0.75rem;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 3rem;
+      min-height: 3rem;
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      color: #fff4d6;
+      background: var(--danger);
+      font-weight: 1000;
+      box-shadow: 0 0.25rem 0 #15110a;
+    }
+
+    .callout {
+      margin: 1rem 0;
+      padding: 1rem 1.1rem;
+      border-left: 0.5rem solid var(--danger);
+      border-radius: 1rem;
+      background: #fff0bd;
+      font-size: 1.15rem;
+      font-weight: 800;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .mini-card {
+      padding: 1rem;
+      border: 2px solid rgba(39,26,16,0.25);
+      border-radius: 1rem;
+      background: rgba(255,255,255,0.55);
+    }
+
+    pre {
+      overflow-x: auto;
+      padding: 1rem;
+      border: 3px solid #15110a;
+      border-radius: 1rem;
+      color: #fff7d6;
+      background: #191006;
+      box-shadow: inset 0 0 0 2px rgba(255,183,3,0.25);
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.95em;
+    }
+
+    .tools {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 1rem;
+      box-shadow: 0 0 0 3px #15110a;
+    }
+
+    .tools th,
+    .tools td {
+      padding: 0.8rem;
+      border-bottom: 2px solid rgba(39,26,16,0.18);
+      text-align: left;
+    }
+
+    .tools th {
+      background: #15110a;
+      color: #fff4d6;
+    }
+
+    .tools tr:nth-child(even) td {
+      background: rgba(255,183,3,0.16);
+    }
+
+    .finale {
+      text-align: center;
+      color: #fff4d6;
+      background: radial-gradient(circle at 50% 0, rgba(255,183,3,0.45), transparent 30%), #1d1207;
+    }
+
+    .finale .scene-title {
+      justify-content: center;
+      color: var(--beer);
+      text-shadow: 0.08em 0.08em 0 #000;
+    }
+
+    .finale p {
+      max-width: 48rem;
+      margin-inline: auto;
+      font-size: 1.25rem;
+    }
+
+    .blink { animation: blink 0.7s steps(2, start) infinite; }
+
+    .rainbow {
+      background: linear-gradient(90deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(2px 2px 0 #000);
+      animation: hue 1.8s linear infinite;
+    }
+
+    .web-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-top: 1rem;
+    }
+
+    .web-badge {
+      padding: 0.25rem 0.45rem;
+      border: 3px outset #ccc;
+      color: #fff;
+      background: #000080;
+      font-size: 0.78rem;
+      font-family: Arial, sans-serif;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .under-construction {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border: 5px dashed #000;
+      color: #000;
+      background: repeating-linear-gradient(45deg, #ff0 0 1rem, #000 1rem 2rem);
+      text-align: center;
+      font-size: 1.35rem;
+      font-weight: 1000;
+      text-shadow: 1px 1px 0 #fff;
+    }
+
+    .visitor-counter {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.25rem 0.55rem;
+      border: 4px inset #aaa;
+      color: #00ff66;
+      background: #000;
+      font-family: "Courier New", monospace;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+    @keyframes hue { to { filter: hue-rotate(360deg) drop-shadow(2px 2px 0 #000); } }
+    @keyframes wobble {
+      0%, 100% { transform: rotate(-7deg) scale(1); }
+      50% { transform: rotate(7deg) scale(1.08); }
+    }
+    @keyframes floaty { to { translate: 0 -0.7rem; } }
+
+    @media (max-width: 820px) {
+      .hero-card,
+      .grid { grid-template-columns: 1fr; }
+      .hero { padding-top: 1rem; }
+      main { margin-top: -2.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <marquee class="top-marquee" behavior="alternate" scrollamount="14">🎳 WELCOME TO THE BEER GAME BENCHMARK 🎳 BEST VIEWED IN EDGE AT 800x600 🎳 THE DUDE ABIDES 🎳</marquee>
+  <marquee class="bottom-marquee" scrollamount="10">🔥 RUN THE BUNDLE 🔥 FEAR THE BULLWHIP 🔥 OUTPUT GOES IN /tmp 🔥 SIGN MY GUESTBOOK 🔥</marquee>
+
+  <header class="hero">
+    <section class="hero-card" aria-labelledby="title">
+      <div>
+        <span class="kicker">Official unofficial 1996 bowling alley benchmark palace</span>
+        <h1 id="title"><span class="rainbow">Beer Game</span> Benchmark <span>Runbook</span></h1>
+        <p class="tagline"><span class="blink">NEW!</span> A maximum-chaos field guide for running the Beer Game Benchmark without turning your beautiful repo baby into a landfill of CSVs, PNGs, and sadness.</p>
+        <div class="hero-actions">
+          <a class="button" href="#quickstart">Start the roll</a>
+          <a class="button secondary" href="#report">Read the scorecard</a>
+          <a class="button secondary" href="https://github.com/ipdelete/beer-game">GitHub repo</a>
+        </div>
+        <div class="web-badges" aria-label="Fake 1990s web badges">
+          <span class="web-badge">No frames!</span>
+          <span class="web-badge">Bowling ring</span>
+          <span class="web-badge">Under construction</span>
+          <span class="web-badge">Dude certified</span>
+          <span class="web-badge">Localhost pride</span>
+        </div>
+        <div class="visitor-counter">RUNS: 00000042</div>
+      </div>
+      <div class="stage" aria-label="A bright bowling alley benchmark illustration">
+        <div class="ball" aria-hidden="true">🎳</div>
+        <div class="role one">retailer</div>
+        <div class="role two">wholesaler</div>
+        <div class="role three">distributor</div>
+        <div class="role four">factory</div>
+        <div class="beer" aria-hidden="true">🍺</div>
+      </div>
+    </section>
+  </header>
+
+  <main>
+    <section class="panel hot">
+      <h2 class="scene-title"><span class="badge">!</span> Welcome to lane 7, benchmark brotha</h2>
+      <p>This page has been spiritually uploaded by dial-up modem, blessed by a neon bowling ball, and decorated by someone who just discovered gradients, marquees, and the phrase "statistical significance."</p>
+      <div class="under-construction">🚧 ALWAYS UNDER CONSTRUCTION / ALWAYS OUTPUT TO /tmp 🚧</div>
+    </section>
+
+    <section class="panel hot" id="quickstart">
+      <h2 class="scene-title"><span class="badge">1</span> Lace up the shoes</h2>
+      <p>Clone the repo, install the Python environment, and keep the beverage clear of the keyboard. This is the Beer Game Benchmark. It simulates Sterman's four-role supply chain and scores models by what the system actually does.</p>
+      <div class="callout">The benchmark name is <strong>Beer Game Benchmark</strong>. The game is retailer → wholesaler → distributor → factory. The enemy is the bullwhip effect.</div>
+      <ol>
+        <li>Open a terminal.</li>
+        <li>Go to the repo.</li>
+        <li>Sync dependencies.</li>
+      </ol>
+      <pre><code>cd ~/src/beer-game
+uv sync</code></pre>
+      <p>If that works, you are standing on the approach. The pins are nervous.</p>
+    </section>
+
+    <section class="panel">
+      <h2 class="scene-title"><span class="badge">2</span> Roll a one-frame smoke test</h2>
+      <p>Run the smallest mechanistic bundle first. No model server, no drama, no weird root-folder confetti.</p>
+      <pre><code>uv run bench run --mode mechanistic --turns 1 --run-id smoke-mech</code></pre>
+      <p>By default, generated bundles land here:</p>
+      <pre><code>/tmp/beer-game-runs/smoke-mech.eval</code></pre>
+      <div class="callout">If a CSV, PNG, or random run folder appears in the repo root, somebody rolled over the foul line.</div>
+    </section>
+
+    <section class="panel hot">
+      <h2 class="scene-title"><span class="badge">3</span> Run the real config</h2>
+      <p>The checked-in smoke config proves layered YAML resolution, scenario imports, model imports, and bundle writing all still tie the room together.</p>
+      <pre><code>uv run bench run --config configs/runs/smoke.yaml --run-id config-smoke</code></pre>
+      <p>Want to put outputs somewhere else? Say so explicitly, like an adult wearing bowling shoes:</p>
+      <pre><code>uv run bench run \
+  --config configs/runs/smoke.yaml \
+  --runs-dir /tmp/beer-game-night \
+  --run-id league-night</code></pre>
+      <p>The repo stays clean. The rug survives.</p>
+    </section>
+
+    <section class="panel" id="report">
+      <h2 class="scene-title"><span class="badge">4</span> Read the scorecard</h2>
+      <p>Reports are plain terminal tables: tokens, latency, costs, metrics, parse strategy histograms. No velvet rope, no cloud dashboard, no guy named Chad asking you to sign in.</p>
+      <pre><code>uv run bench report smoke-mech</code></pre>
+      <p>Or point straight at the bundle:</p>
+      <pre><code>uv run python -m src.bench.report /tmp/beer-game-runs/smoke-mech.eval</code></pre>
+      <div class="grid">
+        <div class="mini-card"><strong>Total cost:</strong> lower is better.</div>
+        <div class="mini-card"><strong>Bullwhip:</strong> factory variance versus demand variance.</div>
+        <div class="mini-card"><strong>Parse success:</strong> did the model give usable orders?</div>
+        <div class="mini-card"><strong>Recovery:</strong> did the system calm down after the shock?</div>
+      </div>
+    </section>
+
+    <section class="panel hot">
+      <h2 class="scene-title"><span class="badge">5</span> Bring in a model</h2>
+      <p>For GABM mode, point the benchmark at an OpenAI-compatible local endpoint. Ollama is the usual house ball.</p>
+      <pre><code>LLM_ENDPOINT="http://localhost:11434/v1" \
+LLM_MODEL="mistral:latest" \
+uv run bench run --mode gabm --turns 1 --run-id smoke-gabm</code></pre>
+      <p>The model plays each role by placing integer orders. The simulator enforces the supply chain. Nobody gets to whisper across lanes.</p>
+    </section>
+
+    <section class="panel">
+      <h2 class="scene-title"><span class="badge">6</span> Compare two bowlers</h2>
+      <p>When a bundle has paired model results across the same scenarios and epochs, compare them with bootstrap significance. Science, but with rental shoes.</p>
+      <pre><code>uv run bench compare /tmp/beer-game-runs/&lt;run_id&gt;.eval \
+  --baseline model-a \
+  --challenger model-b \
+  --metric total_cost</code></pre>
+      <p>Matched pairs matter. Same scenarios. Same epochs. Same demand seeds. No funny business from lane 12.</p>
+    </section>
+
+    <section class="panel hot">
+      <h2 class="scene-title"><span class="badge">7</span> What is inside the mystery artifact?</h2>
+      <table class="tools">
+        <thead>
+          <tr><th>File</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>manifest.json</code></td><td>Run provenance, config snapshot, model list, scenario list.</td></tr>
+          <tr><td><code>scenarios.jsonl</code></td><td>Demand pattern, costs, weeks, release metadata.</td></tr>
+          <tr><td><code>games.jsonl</code></td><td>One row per game with status, cost, model, scenario, epoch.</td></tr>
+          <tr><td><code>states.parquet</code></td><td>Inventory, backlog, shipment, order, and cost per week and role.</td></tr>
+          <tr><td><code>decisions.parquet</code></td><td>Model-call telemetry and parsed decisions.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2 class="scene-title"><span class="badge">8</span> Keep the alley clean</h2>
+      <ol>
+        <li>Generated bundles default to <code>/tmp/beer-game-runs</code>.</li>
+        <li>Comparison plots default to <code>/tmp/beer-game-comparison</code>.</li>
+        <li>Tournament scripts default to <code>/tmp/beer-game-tournament</code>.</li>
+        <li>Do not commit generated CSVs, PNGs, caches, logs, or local model output.</li>
+        <li>Small fixtures belong under <code>docs/examples/</code> only when they are intentional.</li>
+      </ol>
+      <p><code>/tmp</code> means "this machine, this run, disposable." Local. Cozy. Repo-safe.</p>
+    </section>
+
+    <section class="panel hot">
+      <h2 class="scene-title"><span class="badge">9</span> Emergency lane check</h2>
+      <p>If something smells like stale nachos and broken packaging metadata, run:</p>
+      <pre><code>git status --short --ignored --untracked-files=all</code></pre>
+      <p>Expected local weirdness: <code>.venv/</code>. Suspicious weirdness: root CSVs, root PNGs, <code>tournament_results/</code>, caches everywhere, or anything named like it escaped from 1998.</p>
+    </section>
+
+    <section class="panel finale">
+      <h2 class="scene-title">Final lane speech <span>🎳</span></h2>
+      <p>"Run the benchmark. Read the bundle. Respect the delays. Fear the bullwhip. Keep generated junk in /tmp. The repo is not a storage unit."</p>
+      <p><a href="#title">Back to top</a> • <a href="https://github.com/ipdelete/beer-game">Join the league</a> • <span class="blink">Bookmark this page!</span></p>
+      <p><strong>The dude abides.</strong></p>
+    </section>
+  </main>
+</body>
+</html>

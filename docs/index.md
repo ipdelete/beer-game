@@ -16,6 +16,8 @@ quantitative benchmark for local language models running under Ollama.
 - **[Roadmap](./roadmap.md)** — active benchmark architecture direction.
 - **[Facilitator cheat sheet](./facilitator-cheatsheet.md)** and
   **[player cheat sheet](./player-cheatsheet.md)** — classroom/run support.
+- **[Beer Game Benchmark runbook](./beer-game-benchmark.html)** — 90s bowling
+  alley guide for running bundles without littering the repo.
 
 ## Historical leaderboard snapshot
 
