@@ -193,3 +193,64 @@ def test_bench_run_config_writes_resolved_manifest(tmp_path):
     assert cfg == load_config("configs/runs/smoke.yaml")
     assert manifest["config_hash"] == resolved_config_hash(cfg)
     assert manifest["active_release"] == "2026-Q2"
+
+
+def test_bench_run_active_release_filters_future_scenarios(tmp_path):
+    config_path = tmp_path / "release-run.yaml"
+    config_path.write_text("""
+schema_version: "1.0.0"
+run_seed: 12345
+weeks: 1
+epochs: 1
+mode: mechanistic
+runner: {parallel: 1, persist_traces: false}
+cache: {enabled: true}
+scenarios:
+  - import: "active.yaml"
+  - import: "future.yaml"
+models:
+  - import: "model.yaml"
+telemetry: {}
+""")
+    (tmp_path / "model.yaml").write_text(
+        "id: mechanistic\nprovider: mechanistic\nmodel: mechanistic\n"
+    )
+    (tmp_path / "active.yaml").write_text(_scenario_yaml("active", "2026-Q1"))
+    (tmp_path / "future.yaml").write_text(_scenario_yaml("future", "2027-Q1"))
+
+    result = CliRunner().invoke(
+        bench,
+        [
+            "run",
+            "--config",
+            str(config_path),
+            "--active-release",
+            "2026-Q2",
+            "--runs-dir",
+            str(tmp_path),
+            "--run-id",
+            "release-smoke",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    manifest = json.loads(
+        (tmp_path / "release-smoke.eval" / "manifest.json").read_text()
+    )
+    assert manifest["active_release"] == "2026-Q2"
+    assert [
+        scenario["scenario_id"] for scenario in manifest["config"]["scenarios"]
+    ] == ["active"]
+
+
+def _scenario_yaml(scenario_id: str, release_date: str) -> str:
+    return f"""
+scenario_id: {scenario_id}
+demand_pattern: step
+params: {{low: 4, high: 8, step_week: 5}}
+weeks: 1
+costs: {{holding: 0.5, backlog: 1.0}}
+scenario_seed: 42
+release_date: "{release_date}"
+removal_date: null
+"""

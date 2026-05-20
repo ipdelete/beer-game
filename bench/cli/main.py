@@ -47,6 +47,7 @@ def bench() -> None:
 @click.option("--runs-dir", type=click.Path(path_type=Path), default=None)
 @click.option("--run-id", type=str, default=None)
 @click.option("--config", type=click.Path(path_type=Path), default=None)
+@click.option("--active-release", type=str, default=None)
 @click.option("--scenario", type=str, default=None)
 @click.option("--model", type=str, default=None)
 @click.option("--no-cache", is_flag=True, default=False)
@@ -60,6 +61,7 @@ def run(
     runs_dir: Path | None,
     run_id: str | None,
     config: Path | None,
+    active_release: str | None,
     scenario: str | None,
     model: str | None,
     no_cache: bool,
@@ -84,6 +86,7 @@ def run(
             root=runs_dir_from_option(runs_dir),
             run_id=run_id,
             config_path=config,
+            active_release=active_release,
             **(
                 {}
                 if config is not None

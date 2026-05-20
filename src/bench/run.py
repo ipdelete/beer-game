@@ -18,6 +18,7 @@ from src.bench.bundle import (
     utc_now,
 )
 from src.bench.config import load_config
+from src.bench.scenarios import filter_scenarios, parse_release
 from src.bench.telemetry import configure_telemetry, decision_context
 from src.engine.simulation import BeerGameEngine
 from src.engine.state import PlayerView
@@ -47,6 +48,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--run-seed", type=int, default=12345, help="Top-level seed")
     parser.add_argument("--epochs", type=int, default=1, help="Repeated games to run")
     parser.add_argument("--config", type=Path, default=None, help="Resolved run YAML")
+    parser.add_argument(
+        "--active-release", type=str, default=None, help="Scenario release pin"
+    )
     args = parser.parse_args(argv)
     if args.config is None and args.epochs < 1:
         parser.error("--epochs must be at least 1")
@@ -59,6 +63,7 @@ def main(argv: list[str] | None = None) -> None:
         run_seed=args.run_seed,
         epochs=args.epochs,
         config_path=args.config,
+        active_release=args.active_release,
     )
     print(bundle_path)
 
@@ -73,6 +78,7 @@ def run_bundle(
     epochs: int = 1,
     config_path: Path | str | None = None,
     config: dict | None = None,
+    active_release: str | None = None,
 ) -> Path:
     """Run one Beer Game and write an `.eval` bundle."""
 
@@ -84,11 +90,13 @@ def run_bundle(
     if config is None:
         if epochs < 1:
             raise ValueError("epochs must be at least 1")
-        scenario = _scenario(turns)
+        selected_active_release = active_release or ACTIVE_RELEASE
+        parse_release(selected_active_release)
+        scenario = _scenario(turns, selected_active_release)
         model = _model(mode)
         config = {
             "schema_version": "1.0.0",
-            "active_release": ACTIVE_RELEASE,
+            "active_release": selected_active_release,
             "weeks": turns,
             "epochs": epochs,
             "mode": mode,
@@ -100,6 +108,15 @@ def run_bundle(
             "telemetry": {"otlp_endpoint": None},
         }
     else:
+        selected_active_release = active_release or config.get("active_release")
+        selected_active_release, scenarios = filter_scenarios(
+            config["scenarios"], selected_active_release
+        )
+        config = {
+            **config,
+            "active_release": selected_active_release,
+            "scenarios": scenarios,
+        }
         _ensure_single_config_game(config)
         scenario = dict(config["scenarios"][0])
         model = dict(config["models"][0])
@@ -274,7 +291,7 @@ def _decision_fn(
     return decide
 
 
-def _scenario(turns: int) -> dict:
+def _scenario(turns: int, release_date: str = ACTIVE_RELEASE) -> dict:
     return {
         "scenario_id": SCENARIO_ID if turns == 36 else f"step_4_8_{turns}w",
         "demand_pattern": "step",
@@ -282,7 +299,7 @@ def _scenario(turns: int) -> dict:
         "weeks": turns,
         "costs": {"holding": HOLDING_COST, "backlog": BACKLOG_COST},
         "scenario_seed": SCENARIO_SEED,
-        "release_date": ACTIVE_RELEASE,
+        "release_date": release_date,
         "removal_date": None,
     }
 
