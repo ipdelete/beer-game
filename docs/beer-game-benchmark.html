@@ -128,11 +128,11 @@
     .hero::after {
       content: "AEROBIC COSMIC BOWL-A-THON";
       position: absolute;
-      top: 5.4rem;
-      right: -7rem;
+      top: 6.4rem;
+      right: 1.5rem;
       z-index: 0;
-      padding: 0.45rem 7rem;
-      transform: rotate(18deg);
+      padding: 0.45rem 1.4rem;
+      transform: rotate(8deg);
       color: #04000f;
       background: linear-gradient(90deg, var(--green), var(--beer), var(--pink));
       border-block: 0.35rem solid #fff;
@@ -283,20 +283,21 @@
     .ball {
       position: absolute;
       bottom: 1.5rem;
-      width: min(12rem, 38vw);
+      right: 1.5rem;
+      width: min(6rem, 18vw);
       aspect-ratio: 1;
       border-radius: 50%;
       display: grid;
       place-items: center;
       color: #fff;
       background:
-        radial-gradient(circle at 35% 30%, #fff 0 0.8rem, transparent 0.9rem),
-        radial-gradient(circle at 55% 24%, #111 0 0.6rem, transparent 0.7rem),
-        radial-gradient(circle at 62% 42%, #111 0 0.65rem, transparent 0.75rem),
-        radial-gradient(circle at 42% 45%, #111 0 0.55rem, transparent 0.65rem),
+        radial-gradient(circle at 35% 30%, #fff 0 0.45rem, transparent 0.5rem),
+        radial-gradient(circle at 55% 24%, #111 0 0.3rem, transparent 0.36rem),
+        radial-gradient(circle at 62% 42%, #111 0 0.32rem, transparent 0.38rem),
+        radial-gradient(circle at 42% 45%, #111 0 0.28rem, transparent 0.34rem),
         linear-gradient(135deg, #00f5ff, #bc13fe 45%, #050208);
-      box-shadow: 0 0 1.6rem rgba(0,245,255,0.9), 0 0 2.4rem rgba(255,43,214,0.75), 0 1rem 1rem rgba(0,0,0,0.55);
-      font-size: 2.4rem;
+      box-shadow: 0 0 1.2rem rgba(0,245,255,0.9), 0 0 2rem rgba(255,43,214,0.7), 0 0.6rem 0.8rem rgba(0,0,0,0.55);
+      font-size: 1.6rem;
       animation: roll 2.6s ease-in-out infinite alternate;
     }
 
@@ -320,10 +321,10 @@
       text-transform: uppercase;
     }
 
-    .retailer { top: 13%; left: 42%; transform: rotate(-4deg); }
-    .wholesaler { top: 33%; left: 25%; transform: rotate(7deg); }
-    .distributor { top: 33%; right: 25%; transform: rotate(-8deg); }
-    .factory { top: 55%; left: 42%; transform: rotate(4deg); }
+    .retailer { top: 14%; left: 46%; transform: rotate(-4deg); }
+    .wholesaler { top: 30%; left: 30%; transform: rotate(7deg); }
+    .distributor { top: 30%; left: 62%; transform: rotate(-8deg); }
+    .factory { top: 46%; left: 46%; transform: rotate(4deg); }
 
     main {
       position: relative;
