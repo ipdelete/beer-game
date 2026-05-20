@@ -3,33 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
 import os
-import time
 from pathlib import Path
-from typing import Callable
 
-from src.bench.bundle import (
-    ROLE_NAMES,
-    ROLE_TITLES,
-    BundleWriter,
-    demand_hash,
-    make_sortable_id,
-    stable_hash_int,
-    utc_now,
-)
-from src.bench.cache import ResponseCache
 from src.bench.config import load_config
-from src.bench.scenarios import filter_scenarios, parse_release
-from src.bench.telemetry import configure_telemetry, decision_context
-from src.engine.simulation import BeerGameEngine
-from src.engine.state import PlayerView
-from src.gabm.agent import DEFAULT_ENDPOINT, DEFAULT_MODEL, PROMPT_VERSION
-from src.gabm.agent import configure_cache as configure_gabm_cache
-from src.gabm.agent import configure_model as configure_gabm_model
-from src.gabm.agent import gabm_decision, reset_state as reset_gabm
-from src.mechanistic.agent import mechanistic_decision, reset_state as reset_mech
+from src.bench.runner import ACTIVE_RELEASE, run_matrix
+from src.bench.scenarios import parse_release
+from src.gabm.agent import DEFAULT_ENDPOINT, DEFAULT_MODEL
 
 SCENARIO_ID = "step_4_8_36w"
 ACTIVE_RELEASE = "2026-Q2"
@@ -66,6 +46,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--cache-dir", type=Path, default=None, help="Response cache dir"
     )
+    parser.add_argument("--parallel", type=int, default=None, help="Worker count")
+    parser.add_argument("--force", action="store_true", help="Rerun existing bundle")
+    parser.add_argument(
+        "--no-retry-errors",
+        action="store_true",
+        help="Keep failed games when resuming instead of retrying them",
+    )
     args = parser.parse_args(argv)
     if args.config is None and args.epochs < 1:
         parser.error("--epochs must be at least 1")
@@ -84,6 +71,9 @@ def main(argv: list[str] | None = None) -> None:
         no_cache=args.no_cache,
         refresh_cache=args.refresh_cache,
         cache_dir=args.cache_dir,
+        parallel=args.parallel,
+        force=args.force,
+        no_retry_errors=args.no_retry_errors,
     )
     print(bundle_path)
 
@@ -102,6 +92,9 @@ def run_bundle(
     no_cache: bool = False,
     refresh_cache: bool = False,
     cache_dir: Path | str | None = None,
+    parallel: int | None = None,
+    force: bool = False,
+    no_retry_errors: bool = False,
 ) -> Path:
     """Run one Beer Game and write an `.eval` bundle."""
 
@@ -133,205 +126,20 @@ def run_bundle(
             "telemetry": {"otlp_endpoint": None},
         }
     else:
-        selected_active_release = active_release or config.get("active_release")
-        selected_active_release, scenarios = filter_scenarios(
-            config["scenarios"], selected_active_release
-        )
-        config = {
-            **config,
-            "active_release": selected_active_release,
-            "scenarios": scenarios,
-        }
-        _ensure_single_config_game(config)
-        scenario = dict(config["scenarios"][0])
-        model = dict(config["models"][0])
-        turns = int(scenario.get("weeks") or config["weeks"])
-        epochs = int(config["epochs"])
-        run_seed = int(config["run_seed"])
-        mode = _mode_from_config(config, model)
-    if mode == "gabm" and "prompt_version" not in config:
-        config = {**config, "prompt_version": PROMPT_VERSION}
-    if no_cache:
-        config = {**config, "cache": {**config.get("cache", {}), "enabled": False}}
+        if active_release is not None:
+            config = {**config, "active_release": active_release}
 
-    writer = BundleWriter(root, run_id=run_id)
-    writer.start(models=[model], scenarios=[scenario], config=config)
-
-    telemetry_session = configure_telemetry(writer) if mode == "gabm" else None
-    if mode == "gabm":
-        configure_gabm_model(model)
-        configure_gabm_cache(
-            ResponseCache(
-                cache_dir,
-                enabled=not no_cache and config.get("cache", {}).get("enabled", True),
-                refresh=refresh_cache,
-            )
-        )
-    try:
-        for epoch in range(epochs):
-            _run_game(
-                writer=writer,
-                scenario=scenario,
-                model=model,
-                turns=turns,
-                mode=mode,
-                run_seed=run_seed,
-                epoch=epoch,
-                prompt_version=config.get("prompt_version"),
-            )
-    except Exception:
-        if telemetry_session is not None:
-            telemetry_session.shutdown()
-        if mode == "gabm":
-            configure_gabm_model(None)
-            configure_gabm_cache(None)
-        raise
-    if telemetry_session is not None:
-        telemetry_session.shutdown()
-    if mode == "gabm":
-        configure_gabm_model(None)
-        configure_gabm_cache(None)
-    return writer.finish()
-
-
-def _run_game(
-    *,
-    writer: BundleWriter,
-    scenario: dict,
-    model: dict,
-    turns: int,
-    mode: str,
-    run_seed: int,
-    epoch: int,
-    prompt_version: str | None,
-) -> None:
-    game_id = make_sortable_id("game")
-    demand_seed = stable_hash_int(
-        (run_seed, scenario["scenario_id"], scenario["scenario_seed"], epoch)
+    return run_matrix(
+        config,
+        root=root,
+        run_id=run_id,
+        parallel=parallel,
+        force=force,
+        no_retry_errors=no_retry_errors,
+        no_cache=no_cache,
+        refresh_cache=refresh_cache,
+        cache_dir=cache_dir,
     )
-    llm_seed = stable_hash_int((run_seed, scenario["scenario_id"], model["id"], epoch))
-
-    decision_rows: list[dict] = []
-
-    def record_decision(view: PlayerView, decision: int) -> None:
-        decision_rows.append(
-            {
-                "run_id": writer.run_id,
-                "game_id": game_id,
-                "scenario_id": scenario["scenario_id"],
-                "epoch": epoch,
-                "week": view.week,
-                "role": _role_name(view.role),
-                "model_request": model["id"],
-                "model_response": None if mode == "mechanistic" else model["id"],
-                "provider": model["provider"],
-                "temperature": model.get("temperature"),
-                "top_p": model.get("top_p"),
-                "seed_request": llm_seed,
-                "input_tokens": None,
-                "output_tokens": None,
-                "reasoning_tokens": None,
-                "cache_read_input_tokens": None,
-                "finish_reason": None,
-                "response_id": None,
-                "latency_ms": None,
-                "time_to_first_chunk_ms": None,
-                "parse_ok": True,
-                "parse_strategy": mode,
-                "decision_int": decision,
-                "context_used": None,
-                "context_window": None,
-                "cache_hit": False,
-                "error_type": None,
-                "raw_response_ref": None,
-            }
-        )
-
-    decision_fn = _decision_fn(
-        mode,
-        record_decision,
-        {
-            "run_id": writer.run_id,
-            "game_id": game_id,
-            "scenario_id": scenario["scenario_id"],
-            "scenario_release": scenario.get("release_date") or ACTIVE_RELEASE,
-            "epoch": epoch,
-            "llm_seed": llm_seed,
-            "scenario_params_hash": _scenario_params_hash(scenario),
-            "demand_hash": _scenario_demand_hash(scenario, turns),
-            "prompt_version": prompt_version,
-        },
-    )
-    engine = BeerGameEngine(decision_fn=decision_fn)
-
-    started = time.monotonic()
-    status = "ok"
-    error = None
-    try:
-        for _ in range(turns):
-            engine.simulate_week()
-    except Exception as exc:
-        status = "error"
-        error = f"{type(exc).__name__}: {exc}"
-        raise
-    finally:
-        wall_seconds = time.monotonic() - started
-
-    ended_at = utc_now()
-    if mode != "gabm":
-        writer.append_decisions(decision_rows)
-    writer.append_states(_state_rows(writer.run_id, game_id, engine))
-    writer.append_game(
-        {
-            "game_id": game_id,
-            "run_id": writer.run_id,
-            "scenario_id": scenario["scenario_id"],
-            "model": model["id"],
-            "epoch": epoch,
-            "demand_seed": demand_seed,
-            "llm_seed": llm_seed,
-            "started_at": writer.started_at,
-            "ended_at": ended_at,
-            "status": status,
-            "error": error,
-            "demand_hash": demand_hash(engine.order_history["Customer"]),
-            "total_cost": (
-                sum(engine.get_total_costs().values()) if status == "ok" else None
-            ),
-            "wall_seconds": wall_seconds,
-        }
-    )
-
-
-def _decision_fn(
-    mode: str,
-    record_decision: Callable[[PlayerView, int], None],
-    telemetry_fields: dict,
-) -> Callable[[PlayerView], int]:
-    if mode == "mechanistic":
-        reset_mech()
-        base_decision = mechanistic_decision
-    else:
-        reset_gabm()
-        base_decision = gabm_decision
-
-    def decide(view: PlayerView) -> int:
-        if mode == "gabm":
-            with decision_context(
-                **telemetry_fields,
-                week=view.week,
-                role=_role_name(view.role),
-                cache_hit=False,
-                context_used=None,
-                context_window=None,
-            ):
-                return max(0, int(base_decision(view)))
-
-        decision = max(0, int(base_decision(view)))
-        record_decision(view, decision)
-        return decision
-
-    return decide
 
 
 def _scenario(turns: int, release_date: str = ACTIVE_RELEASE) -> dict:
@@ -345,35 +153,6 @@ def _scenario(turns: int, release_date: str = ACTIVE_RELEASE) -> dict:
         "release_date": release_date,
         "removal_date": None,
     }
-
-
-def _scenario_params_hash(scenario: dict) -> str:
-    payload = json.dumps(
-        scenario.get("params", {}),
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode()
-    return hashlib.md5(payload, usedforsecurity=False).hexdigest()
-
-
-def _scenario_demand_hash(scenario: dict, turns: int) -> str:
-    pattern = scenario.get("demand_pattern")
-    params = scenario.get("params", {})
-    if pattern == "step":
-        low = int(params.get("low", 4))
-        high = int(params.get("high", 8))
-        step_week = int(params.get("step_week", 5))
-        demand = [low if week < step_week else high for week in range(1, turns + 1)]
-        return demand_hash(demand)
-    if pattern == "constant":
-        demand = [int(params["value"])] * turns
-        return demand_hash(demand)
-    payload = json.dumps(
-        {"pattern": pattern, "params": params, "turns": turns},
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode()
-    return hashlib.md5(payload, usedforsecurity=False).hexdigest()
 
 
 def _model(mode: str) -> dict:
@@ -393,61 +172,6 @@ def _model(mode: str) -> dict:
         "temperature": 0.4,
         "top_p": None,
     }
-
-
-def _ensure_single_config_game(config: dict) -> None:
-    if not config.get("models"):
-        raise ValueError("config must define at least one model")
-    if not config.get("scenarios"):
-        raise ValueError("config must define at least one scenario")
-    if len(config["models"]) > 1 or len(config["scenarios"]) > 1:
-        raise ValueError(
-            "config-driven bench run supports one model and one scenario until #11"
-        )
-
-
-def _mode_from_config(config: dict, model: dict) -> str:
-    provider = model.get("provider")
-    if provider == "mechanistic":
-        return "mechanistic"
-    return config.get("mode") if config.get("mode") == "gabm" else "gabm"
-
-
-def _state_rows(run_id: str, game_id: str, engine: BeerGameEngine) -> list[dict]:
-    rows = []
-    cumulative_cost = {role_title: 0.0 for role_title in ROLE_TITLES}
-    turns = engine.current_week
-    for week_index in range(turns):
-        for role_title, role_name in zip(ROLE_TITLES, ROLE_NAMES):
-            record = engine.history[role_title][week_index]
-            cumulative_cost[role_title] += record.cost
-            rows.append(
-                {
-                    "run_id": run_id,
-                    "game_id": game_id,
-                    "week": record.week,
-                    "role": role_name,
-                    "inventory": record.inventory,
-                    "backlog": record.backlog,
-                    "order_placed": record.order_placed,
-                    "shipment_received": record.shipment_received,
-                    "customer_demand": (
-                        engine.order_history["Customer"][week_index]
-                        if role_name == "retailer"
-                        else None
-                    ),
-                    "cost_week": record.cost,
-                    "cost_cum": cumulative_cost[role_title],
-                }
-            )
-    return rows
-
-
-def _role_name(role_title: str) -> str:
-    role = role_title.lower()
-    if role not in ROLE_NAMES:
-        raise ValueError(f"Unknown Beer Game role: {role_title}")
-    return role
 
 
 if __name__ == "__main__":

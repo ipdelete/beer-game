@@ -17,6 +17,7 @@ from src.bench.metrics import (
     run_metric_reducers,
     run_metrics,
 )
+from src.bench import reducers
 from src.bench.query import open_bundle
 
 
@@ -33,6 +34,9 @@ def print_report(con: duckdb.DuckDBPyConnection, bundle_path: str | Path) -> Non
     """Print summary, token, and latency tables for an open bundle."""
 
     print_summary(con, bundle_path)
+    if has_matrix(con):
+        print()
+        print_matrix(con)
     print()
     print_tokens(con)
     print()
@@ -161,6 +165,72 @@ def print_metrics(con: duckdb.DuckDBPyConnection) -> None:
         ]
     print("Metrics")
     print(_format_table(["metric", "value"], rows))
+
+
+def has_matrix(con: duckdb.DuckDBPyConnection) -> bool:
+    scenarios, models = con.execute("""
+        SELECT count(DISTINCT scenario_id), count(DISTINCT model)
+        FROM games
+        """).fetchone()
+    return scenarios > 1 and models > 1
+
+
+def print_matrix(con: duckdb.DuckDBPyConnection) -> None:
+    scenarios = [
+        row[0]
+        for row in con.execute(
+            "SELECT DISTINCT scenario_id FROM games ORDER BY scenario_id"
+        ).fetchall()
+    ]
+    models = [
+        row[0]
+        for row in con.execute(
+            "SELECT DISTINCT model FROM games ORDER BY model"
+        ).fetchall()
+    ]
+    values = _total_cost_matrix(con)
+    rows = []
+    for model in models:
+        rows.append(
+            [
+                model,
+                *[
+                    _format_reduced_metric_value(
+                        "total_cost", values.get((model, scenario), _empty_metric())
+                    )
+                    for scenario in scenarios
+                ],
+            ]
+        )
+    print(
+        f"Matrix: {len(scenarios)} scenarios x {len(models)} models "
+        f"x {epoch_count(con)} epochs"
+    )
+    print(_format_table(["model", *scenarios], rows))
+
+
+def _total_cost_matrix(
+    con: duckdb.DuckDBPyConnection,
+) -> dict[tuple[str, str], ReducedMetric]:
+    grouped: dict[tuple[str, str], list[float]] = defaultdict(list)
+    for model, scenario, cost in con.execute("""
+        SELECT model, scenario_id, total_cost
+        FROM games
+        WHERE total_cost IS NOT NULL
+        ORDER BY model, scenario_id, epoch
+        """).fetchall():
+        grouped[(model, scenario)].append(float(cost))
+    result = {}
+    for key, costs in grouped.items():
+        error = reducers.bootstrap_stderr(costs) if len(costs) > 1 else None
+        result[key] = ReducedMetric(
+            value=reducers.mean(costs), error=error, n=len(costs), values=costs
+        )
+    return result
+
+
+def _empty_metric() -> ReducedMetric:
+    return ReducedMetric(value=None, error=None, n=0, values=[])
 
 
 def _group_rows(rows: list[tuple[Any, ...]]) -> dict[str, list[tuple[Any, ...]]]:

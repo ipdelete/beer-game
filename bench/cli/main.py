@@ -53,6 +53,9 @@ def bench() -> None:
 @click.option("--no-cache", is_flag=True, default=False)
 @click.option("--refresh-cache", is_flag=True, default=False)
 @click.option("--cache-dir", type=click.Path(path_type=Path), default=None)
+@click.option("--parallel", type=int, default=None)
+@click.option("--force", is_flag=True, default=False)
+@click.option("--no-retry-errors", is_flag=True, default=False)
 @click.option("--persist-traces", is_flag=True, default=False)
 def run(
     mode: str,
@@ -68,6 +71,9 @@ def run(
     no_cache: bool,
     refresh_cache: bool,
     cache_dir: Path | None,
+    parallel: int | None,
+    force: bool,
+    no_retry_errors: bool,
     persist_traces: bool,
 ) -> None:
     """Wrap `python -m bench.run` with the stable CLI entry point."""
@@ -92,6 +98,9 @@ def run(
             no_cache=no_cache,
             refresh_cache=refresh_cache,
             cache_dir=cache_dir,
+            parallel=parallel,
+            force=force,
+            no_retry_errors=no_retry_errors,
             **(
                 {}
                 if config is not None

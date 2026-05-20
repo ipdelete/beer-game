@@ -68,6 +68,11 @@ The resolved config, after all `import`, `default`, and `overwrite` processing,
 is snapshotted into `manifest.json.config`. `manifest.json.config_hash` is a
 stable hash of that resolved config.
 
+Config runs execute the full `scenarios x models x epochs` matrix into one
+bundle. `bench run --parallel N` runs multiple games concurrently, and reusing
+the same `--run-id` resumes a compatible bundle by skipping successful matrix
+cells. `--force` discards the existing bundle and reruns every cell.
+
 GABM runs use a JSON response cache by default, keyed by endpoint, model,
 sampling config, full messages, scenario id and params hash, demand hash,
 prompt version, LLM seed, and epoch. Use `--no-cache` to disable reads and
@@ -148,6 +153,7 @@ One object per bundle.
 | `git_dirty` | bool | no | `git status --porcelain` | Whether the worktree had uncommitted changes. | Provenance |
 | `prompt_version` | string | yes | prompt file hash | Hash or version of prompt templates used by GABM players. | Reproducibility |
 | `config_hash` | string | no | resolved config hash | Hash of the normalized run configuration. | Cache keys, provenance |
+| `matrix_hash` | string | yes | matrix identity hash | Hash of scenario/model/epoch identity fields used to validate resume compatibility. | Runner |
 | `config` | object | no | resolved config | Full run configuration snapshot. | Reproducibility |
 | `active_release` | string, `YYYY-Qn` | no | CLI/config | Scenario release pin used for filtering. | Scenario loader, reports |
 | `run_seed` | int64 | no | CLI/random source | Top-level seed used to derive game seeds. | Reproducibility |

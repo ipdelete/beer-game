@@ -6,6 +6,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import threading
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -115,8 +116,9 @@ class BundleWriter:
         self.run_id = run_id or make_sortable_id("run")
         self.path = self.root / f"{self.run_id}.eval"
         self._manifest: dict[str, Any] | None = None
-        self._decisions: list[dict[str, Any]] = []
-        self._states: list[dict[str, Any]] = []
+        self._decisions: dict[str, list[dict[str, Any]]] = {}
+        self._states: dict[str, list[dict[str, Any]]] = {}
+        self._lock = threading.RLock()
 
     def start(
         self,
@@ -124,52 +126,90 @@ class BundleWriter:
         models: list[dict[str, Any]],
         scenarios: list[dict[str, Any]],
         config: dict[str, Any],
+        matrix_hash: str | None = None,
+        resume: bool = False,
+        existing_games: list[dict[str, Any]] | None = None,
     ) -> None:
         """Create the bundle directory and write initial manifest/scenarios."""
 
-        self.path.mkdir(parents=True, exist_ok=False)
-        (self.path / "traces").mkdir()
+        with self._lock:
+            previous_manifest = (
+                _read_json(self.path / "manifest.json") if resume else {}
+            )
+            self.path.mkdir(parents=True, exist_ok=resume)
+            (self.path / "traces").mkdir(exist_ok=resume)
+            self._partial_root.mkdir(exist_ok=resume)
 
-        self._manifest = {
-            "schema_version": SCHEMA_VERSION,
-            "run_id": self.run_id,
-            "started_at": utc_now(),
-            "ended_at": None,
-            "git_sha": _git_sha(),
-            "git_dirty": _git_dirty(),
-            "prompt_version": config.get("prompt_version"),
-            "config_hash": config_hash(config),
-            "config": config,
-            "active_release": config["active_release"],
-            "run_seed": config["run_seed"],
-            "models": models,
-            "scenario_ids": [scenario["scenario_id"] for scenario in scenarios],
-            "tool_versions": {
-                "beer-game": _project_version(),
-                "python": sys.version.split()[0],
-            },
-        }
-        self._write_json(self.path / "manifest.json", self._manifest)
-        _write_jsonl(self.path / "scenarios.jsonl", scenarios, append=False)
-        (self.path / "games.jsonl").write_text("")
+            self._manifest = {
+                "schema_version": SCHEMA_VERSION,
+                "run_id": self.run_id,
+                "started_at": previous_manifest.get("started_at") or utc_now(),
+                "ended_at": None,
+                "git_sha": previous_manifest.get("git_sha") or _git_sha(),
+                "git_dirty": previous_manifest.get("git_dirty", _git_dirty()),
+                "prompt_version": config.get("prompt_version"),
+                "config_hash": config_hash(config),
+                "matrix_hash": matrix_hash,
+                "config": config,
+                "active_release": config["active_release"],
+                "run_seed": config["run_seed"],
+                "models": models,
+                "scenario_ids": [scenario["scenario_id"] for scenario in scenarios],
+                "tool_versions": {
+                    "beer-game": _project_version(),
+                    "python": sys.version.split()[0],
+                },
+            }
+            self._write_json(self.path / "manifest.json", self._manifest)
+            _write_jsonl(self.path / "scenarios.jsonl", scenarios, append=False)
+            _write_jsonl(self.path / "games.jsonl", existing_games or [], append=False)
 
     def append_game(self, game: dict[str, Any]) -> None:
         """Append one game metadata row to `games.jsonl`."""
 
-        self._ensure_started()
-        _write_jsonl(self.path / "games.jsonl", [game], append=True)
+        with self._lock:
+            self._ensure_started()
+            _write_jsonl(self.path / "games.jsonl", [game], append=True)
 
     def append_decisions(self, rows: list[dict[str, Any]]) -> None:
         """Buffer decision rows for `decisions.parquet`."""
 
-        self._ensure_started()
-        self._decisions.extend(rows)
+        if not rows:
+            return
+        with self._lock:
+            self._ensure_started()
+            for row in rows:
+                self._decisions.setdefault(row["game_id"], []).append(row)
 
     def append_states(self, rows: list[dict[str, Any]]) -> None:
         """Buffer state rows for `states.parquet`."""
 
-        self._ensure_started()
-        self._states.extend(rows)
+        if not rows:
+            return
+        with self._lock:
+            self._ensure_started()
+            for row in rows:
+                self._states.setdefault(row["game_id"], []).append(row)
+
+    def flush_game(self, game_id: str) -> None:
+        """Persist one game's buffered rows before marking the game complete."""
+
+        with self._lock:
+            self._ensure_started()
+            game_path = self._partial_root / game_id
+            game_path.mkdir(parents=True, exist_ok=True)
+            pq.write_table(
+                pa.Table.from_pylist(
+                    self._decisions.pop(game_id, []), schema=DECISIONS_SCHEMA
+                ),
+                game_path / "decisions.parquet",
+            )
+            pq.write_table(
+                pa.Table.from_pylist(
+                    self._states.pop(game_id, []), schema=STATES_SCHEMA
+                ),
+                game_path / "states.parquet",
+            )
 
     @property
     def started_at(self) -> str:
@@ -182,19 +222,34 @@ class BundleWriter:
     def finish(self) -> Path:
         """Write buffered Parquet files, finalize the manifest, and return path."""
 
-        self._ensure_started()
-        pq.write_table(
-            pa.Table.from_pylist(self._decisions, schema=DECISIONS_SCHEMA),
-            self.path / "decisions.parquet",
-        )
-        pq.write_table(
-            pa.Table.from_pylist(self._states, schema=STATES_SCHEMA),
-            self.path / "states.parquet",
-        )
-        assert self._manifest is not None
-        self._manifest["ended_at"] = utc_now()
-        self._write_json(self.path / "manifest.json", self._manifest)
-        return self.path
+        with self._lock:
+            self._ensure_started()
+            game_rows = _read_jsonl(self.path / "games.jsonl")
+            for game_id in set(self._decisions) | set(self._states):
+                self.flush_game(game_id)
+            pq.write_table(
+                _concat_partial_tables(
+                    game_rows,
+                    self._partial_root,
+                    "decisions.parquet",
+                    DECISIONS_SCHEMA,
+                ),
+                self.path / "decisions.parquet",
+            )
+            pq.write_table(
+                _concat_partial_tables(
+                    game_rows, self._partial_root, "states.parquet", STATES_SCHEMA
+                ),
+                self.path / "states.parquet",
+            )
+            assert self._manifest is not None
+            self._manifest["ended_at"] = utc_now()
+            self._write_json(self.path / "manifest.json", self._manifest)
+            return self.path
+
+    @property
+    def _partial_root(self) -> Path:
+        return self.path / "partials"
 
     def _ensure_started(self) -> None:
         if self._manifest is None:
@@ -210,6 +265,32 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]], *, append: bool) -> Non
     with path.open(mode) as handle:
         for row in rows:
             handle.write(json.dumps(row, separators=(",", ":")) + "\n")
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text())
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line]
+
+
+def _concat_partial_tables(
+    games: list[dict[str, Any]], partial_root: Path, filename: str, schema: pa.Schema
+) -> pa.Table:
+    tables = []
+    for game in games:
+        path = partial_root / game["game_id"] / filename
+        if not path.exists():
+            raise FileNotFoundError(f"Missing game partial: {path}")
+        tables.append(pq.read_table(path, schema=schema))
+    if not tables:
+        return pa.Table.from_pylist([], schema=schema)
+    return pa.concat_tables(tables, promote_options="none")
 
 
 def _git_sha() -> str | None:
