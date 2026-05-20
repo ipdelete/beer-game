@@ -92,6 +92,15 @@ future reducers. The built-in metrics are:
 | `parse_success_rate` | Fraction of decision rows where `parse_ok` is true. | `NULL` parse flags count as failures; `None` for empty decision views. |
 | `recovery_time` | Mean elapsed weeks from a step demand shock until system pressure stabilizes. | Only step scenarios are considered; `None` if no game recovers. |
 
+Model comparisons use paired bootstrap significance on matrix bundles:
+
+```bash
+uv run bench compare runs/<run_id>.eval --baseline model-a --challenger model-b --metric total_cost
+```
+
+Pairs are matched by `(scenario_id, epoch)` and require matching `demand_seed`;
+missing or non-numeric metric cells are dropped with warnings.
+
 GABM responses are parsed by an ordered fallback chain in `src.bench.parser`.
 The parser tries strict integers first, then structured wrappers such as JSON,
 boxed answers, and answer tags, before falling back to integers on the final line

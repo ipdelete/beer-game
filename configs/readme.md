@@ -75,6 +75,10 @@ runs the full `scenarios x models x epochs` matrix into one `.eval` bundle.
 it for a single invocation. Reusing the same `--run-id` resumes compatible
 bundles by skipping successful cells, while `--force` reruns from scratch.
 
+Use `bench compare <bundle> --baseline <model> --challenger <model>` to compare
+matrix results with paired bootstrap significance. The comparison pairs models
+by scenario and epoch, so keep matrix configs balanced when possible.
+
 ## Scenario releases
 
 Every scenario must declare `release_date` in `YYYY-Qn` format. `removal_date`

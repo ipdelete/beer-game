@@ -22,6 +22,7 @@ from src.bench import report as text_report
 from src.bench.metrics import epoch_count, run_metric_reducers, run_metrics
 from src.bench.query import open_bundle
 from src.bench.run import run_bundle
+from src.bench.significance import compare_bundle
 
 
 def _version() -> str:
@@ -276,26 +277,95 @@ def show(bundle: str, runs_dir: Path | None, game_id: str | None) -> None:
     )
 
 
-@bench.command(help="Compare models in a bundle; paired bootstrap lands in #15.")
-@click.argument("bundle", required=False)
+@bench.command(help="Compare models with paired bootstrap significance.")
+@click.argument("bundle", required=True)
 @click.option("--runs-dir", type=click.Path(path_type=Path), default=None)
-@click.option("--baseline", type=str, default=None)
-@click.option("--challenger", type=str, default=None)
+@click.option("--baseline", type=str, required=True)
+@click.option("--challenger", type=str, required=True)
+@click.option("--metric", "metric_names", type=str, multiple=True)
+@click.option("--alpha", type=float, default=0.05, show_default=True)
+@click.option("--num-samples", type=int, default=10_000, show_default=True)
+@click.option("--seed", type=int, default=12345, show_default=True)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    show_default=True,
+)
 def compare(
-    bundle: str | None,
+    bundle: str,
     runs_dir: Path | None,
-    baseline: str | None,
-    challenger: str | None,
+    baseline: str,
+    challenger: str,
+    metric_names: tuple[str, ...],
+    alpha: float,
+    num_samples: int,
+    seed: int,
+    output_format: str,
 ) -> None:
-    """Reserve the compare command shape for issue #15."""
+    """Compare paired model results matched by scenario and epoch."""
 
-    if bundle is not None:
-        resolve_bundle(bundle, runs_dir_from_option(runs_dir))
-    if not bundle or not baseline or not challenger:
-        raise click.ClickException(
-            "bench compare <bundle> --baseline X --challenger Y is reserved for #15"
+    bundle_path = resolve_bundle(bundle, runs_dir_from_option(runs_dir))
+    con = open_bundle(bundle_path)
+    try:
+        results, warnings = compare_bundle(
+            con,
+            baseline=baseline,
+            challenger=challenger,
+            metric_names=list(metric_names) or None,
+            alpha=alpha,
+            num_samples=num_samples,
+            seed=seed,
         )
-    raise click.ClickException("bench compare is reserved for #15")
+    except (KeyError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if output_format == "json":
+        click.echo(
+            json.dumps(
+                {
+                    "baseline": baseline,
+                    "challenger": challenger,
+                    "results": [result.to_dict() for result in results],
+                    "warnings": warnings,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    for warning in warnings:
+        click.echo(f"warning: {warning}", err=True)
+    if not results:
+        raise click.ClickException("No comparable metric pairs found")
+    _echo_table(
+        [
+            "metric",
+            "baseline",
+            "challenger",
+            "diff",
+            "ci",
+            "p",
+            "n",
+            "significant",
+            "better",
+        ],
+        [
+            [
+                result.metric,
+                _format_value(result.baseline_mean),
+                _format_value(result.challenger_mean),
+                _format_value(result.diff),
+                f"[{_format_value(result.ci_low)}, {_format_value(result.ci_high)}]",
+                f"{result.p_value:.4f}",
+                str(result.n_pairs),
+                "yes" if result.significant else "no",
+                result.better,
+            ]
+            for result in results
+        ],
+    )
 
 
 def runs_dir_from_option(value: Path | None) -> Path:

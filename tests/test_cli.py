@@ -136,7 +136,7 @@ def test_bench_run_cache_flags_are_mutually_exclusive(tmp_path):
     assert "--no-cache and --refresh-cache are mutually exclusive" in result.output
 
 
-def test_bench_compare_stub_mentions_issue_15(tmp_path):
+def test_bench_compare_reports_missing_models(tmp_path):
     bundle_path = run_bundle(turns=1, root=tmp_path, run_id="compare")
 
     result = CliRunner().invoke(
@@ -152,4 +152,4 @@ def test_bench_compare_stub_mentions_issue_15(tmp_path):
     )
 
     assert result.exit_code != 0
-    assert "#15" in result.output
+    assert "Model not found: a, b" in result.output
