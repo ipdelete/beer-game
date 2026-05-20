@@ -27,6 +27,8 @@ class CacheKey:
     demand_hash: str
     prompt_version: str | None
     epoch: int
+    max_tokens: int | None = None
+    extra_body: dict[str, Any] | None = None
 
     def hash(self) -> str:
         payload = json.dumps(

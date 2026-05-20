@@ -67,6 +67,8 @@ class ModelConfig(BaseModel):
     top_p: float | None = None
     context_window: int | None = None
     max_concurrent: int | None = None
+    max_tokens: int | None = None
+    extra_body: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def normalize_endpoint(self) -> "ModelConfig":

@@ -114,6 +114,8 @@ class GABMAgent:
         self.temperature = config.get("temperature", 0.4)
         self.top_p = config.get("top_p")
         self.context_window = config.get("context_window")
+        self.max_tokens = int(config.get("max_tokens") or 4096)
+        self.extra_body = config.get("extra_body") or None
         self.client = OpenAI(base_url=self.endpoint, api_key="ollama")
         self.system_prompt = _system_prompt(role)
         self.max_plausible_order = max_plausible_order_from_env()
@@ -141,11 +143,13 @@ class GABMAgent:
                 "model": self.model,
                 "messages": messages,
                 "temperature": self.temperature,
-                "max_tokens": 256,
-                "timeout": 60,
+                "max_tokens": self.max_tokens,
+                "timeout": 600,
             }
             if self.top_p is not None:
                 request_kwargs["top_p"] = self.top_p
+            if self.extra_body:
+                request_kwargs["extra_body"] = self.extra_body
             if ctx and ctx.llm_seed is not None:
                 request_kwargs["seed"] = ctx.llm_seed
                 _set_if(span, "gen_ai.request.seed", ctx.llm_seed)
@@ -206,6 +210,8 @@ class GABMAgent:
             demand_hash=ctx.demand_hash,
             prompt_version=ctx.prompt_version,
             epoch=ctx.epoch,
+            max_tokens=self.max_tokens,
+            extra_body=self.extra_body,
         )
 
 

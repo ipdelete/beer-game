@@ -1,0 +1,14 @@
+import: "../gemma4-e4b.yaml"
+
+weeks: 1
+epochs: 1
+
+_list_policy:
+  scenarios: replace
+  models: replace
+
+scenarios:
+  - import: "../../scenarios/step_4_8_smoke.yaml"
+
+models:
+  - import: "../../models/gemma4-e4b-local.yaml"

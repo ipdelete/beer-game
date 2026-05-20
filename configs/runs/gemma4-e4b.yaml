@@ -1,0 +1,15 @@
+import: "../default.yaml"
+
+weeks: 36
+epochs: 3
+mode: gabm
+
+_list_policy:
+  scenarios: replace
+  models: replace
+
+scenarios:
+  - import: "../scenarios/step_4_8_36w.yaml"
+
+models:
+  - import: "../models/gemma4-e4b-local.yaml"
