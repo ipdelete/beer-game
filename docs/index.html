@@ -490,6 +490,83 @@
       text-shadow: 1px 1px 0 #fff;
     }
 
+    .toc-grid {
+      list-style: none;
+      padding: 0;
+      margin: 1.2rem 0 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+      gap: 1rem;
+    }
+
+    .toc-card {
+      position: relative;
+      padding: 1rem;
+      border: 4px double var(--monitor-glow);
+      background:
+        radial-gradient(circle at 88% 14%, rgba(255,230,0,0.22), transparent 22%),
+        linear-gradient(160deg, rgba(2,8,36,0.95), rgba(18,0,64,0.96));
+      box-shadow: 0 0 1.2rem rgba(0,245,255,0.35), inset 0 0 1.2rem rgba(255,43,214,0.22);
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .toc-card.soon {
+      border-color: var(--pink);
+      box-shadow: 0 0 1.2rem rgba(255,43,214,0.4), inset 0 0 1.2rem rgba(255,43,214,0.25);
+      background:
+        repeating-linear-gradient(135deg, rgba(255,255,0,0.06) 0 0.8rem, rgba(255,43,214,0.08) 0.8rem 1.6rem),
+        linear-gradient(160deg, rgba(18,0,64,0.95), rgba(2,0,8,0.96));
+    }
+
+    .toc-lane {
+      align-self: flex-start;
+      padding: 0.15rem 0.55rem;
+      font-family: Impact, "Arial Black", sans-serif;
+      letter-spacing: 0.1em;
+      color: #04000f;
+      background: linear-gradient(90deg, var(--green), var(--beer));
+      border: 2px solid #fff;
+      box-shadow: 0 0 0.4rem var(--green);
+      font-size: 0.85rem;
+    }
+
+    .toc-card h3 {
+      margin: 0;
+      font-family: "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif;
+      font-size: 1.6rem;
+      color: var(--pin);
+      text-shadow: 0 0 0.5rem var(--monitor-glow), 0.05em 0.05em 0 var(--pink);
+    }
+
+    .toc-card.soon h3 {
+      color: var(--beer);
+      text-shadow: 0 0 0.5rem var(--beer), 0.05em 0.05em 0 var(--pink);
+    }
+
+    .toc-card p {
+      margin: 0;
+      color: #f6efff;
+      font-size: 0.97rem;
+      line-height: 1.45;
+    }
+
+    .toc-card .button {
+      align-self: flex-start;
+      margin-top: auto;
+    }
+
+    .toc-card .button.disabled {
+      cursor: not-allowed;
+      opacity: 0.85;
+      filter: saturate(0.7);
+      background: repeating-linear-gradient(45deg, #2a0040 0 0.5rem, #1a002a 0.5rem 1rem);
+      color: var(--beer);
+      border-color: var(--beer);
+      text-shadow: 0 0 0.3rem var(--beer);
+    }
+
     .finale {
       text-align: center;
       color: var(--pin);
@@ -579,9 +656,29 @@
   </header>
 
   <main>
-    <section class="panel hot">
-      <h2 class="scene-title"><span class="badge">!</span> Welcome to lane 7, cosmic benchmark brotha</h2>
-      <p>This page was spiritually uploaded from a blacklight snack bar during an 80s workout video. It has CRT glow, neon carpet that should be illegal, and exactly one serious message: run the benchmark, read the bundle, keep the repo clean.</p>
+    <section class="panel hot" id="toc" aria-labelledby="toc-title">
+      <h2 id="toc-title" class="scene-title"><span class="badge">!</span> Lane assignment board</h2>
+      <p>Three lanes are reserved tonight. Two are still under sticker-wrapped construction tape, but the runbook is fully open.</p>
+      <ul class="toc-grid" aria-label="Beer Game Benchmark site map">
+        <li class="toc-card live">
+          <span class="toc-lane">LANE 1</span>
+          <h3>Runbook</h3>
+          <p>You are here. Quickstart, smoke tests, telemetry, repo hygiene, and where the <code>.eval</code> bundles land.</p>
+          <a class="button" href="#quickstart">Roll the first frame →</a>
+        </li>
+        <li class="toc-card soon">
+          <span class="toc-lane">LANE 2</span>
+          <h3>Benchmark Runs</h3>
+          <p>Browse past <code>.eval</code> bundles — mechanistic and GABM, per turn, per role.</p>
+          <span class="button secondary disabled" aria-disabled="true">Pins still racking…</span>
+        </li>
+        <li class="toc-card soon">
+          <span class="toc-lane">LANE 3</span>
+          <h3>Dashboard</h3>
+          <p>Cosmic scoreboards: inventory, backlog, bullwhip score, model-vs-mechanistic at a glance.</p>
+          <span class="button secondary disabled" aria-disabled="true">Pins still racking…</span>
+        </li>
+      </ul>
       <div class="under-construction">🚧 ALWAYS UNDER CONSTRUCTION / ALWAYS OUTPUT TO /tmp 🚧</div>
     </section>
 
@@ -671,7 +768,7 @@ uv run bench run --mode gabm --turns 1 --run-id smoke-gabm</code></pre>
         <li>Comparison plots default to <code>/tmp/beer-game-comparison</code>.</li>
         <li>Tournament scripts default to <code>/tmp/beer-game-tournament</code>.</li>
         <li>Do not commit generated CSVs, PNGs, caches, logs, or local model output.</li>
-        <li>Small fixtures belong under <code>docs/examples/</code> only when they are intentional.</li>
+        <li>Test fixtures belong under <code>tests/fixtures/</code>, never in <code>docs/</code>.</li>
       </ol>
       <p><code>/tmp</code> means "this machine, this run, disposable." Local. Glowing. Repo-safe.</p>
     </section>

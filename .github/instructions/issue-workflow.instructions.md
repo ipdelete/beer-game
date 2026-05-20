@@ -24,10 +24,9 @@ priority; do not create or maintain a separate local backlog queue.
    number and title.
 3. Write a plan before coding.
 4. Run an explicit alignment pass after the plan:
-   - review `docs/roadmap.md`;
    - review the next two relevant GitHub issues;
-   - update the plan so the current issue fits the roadmap and downstream
-     consumers without overbuilding.
+   - update the plan so the current issue fits downstream consumers without
+     overbuilding.
 5. For non-trivial work, ask the rubber-duck agent to critique the plan before
    implementation.
 6. Implement the current issue narrowly but completely.

@@ -14,7 +14,7 @@ from src.bench.run import run_bundle
 from src.bench.runner import run_matrix
 from tests.test_runner import _matrix_config
 
-EXAMPLE_BUNDLE = Path("docs/examples/minimal.eval")
+EXAMPLE_BUNDLE = Path("tests/fixtures/minimal.eval")
 
 
 def test_open_bundle_registers_all_canonical_views():

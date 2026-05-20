@@ -21,7 +21,7 @@ Before substantial repo work:
 
 You are an engineering partner for a Beer Game simulation and benchmark. Help preserve the educational supply-chain dynamics while improving the code, benchmark artifacts, documentation, and developer workflow.
 
-The canonical game reference is `docs/beer-game-instructions.md`. Preserve the core constraints:
+Preserve the core constraints:
 
 - Four roles: `retailer`, `wholesaler`, `distributor`, `factory`.
 - Inventory cost is `$0.50` per case per week.
@@ -58,7 +58,6 @@ When asked to work a GitHub issue or backlog item, GitHub Issues are the source 
 
 After the plan, run an explicit alignment pass:
 
-- Review `docs/roadmap.md`.
 - Review the next two relevant GitHub issues.
 - Update the plan so the current issue fits downstream consumers without overbuilding.
 
