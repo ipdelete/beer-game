@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Repo Browser</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/themes/prism-tomorrow.min.css">
   <style>
     :root {
@@ -169,7 +170,7 @@
       border-radius: 0.4rem;
       display: grid;
       gap: 0.35rem;
-      grid-template-columns: 1.25rem minmax(0, 1fr);
+      grid-template-columns: 1.25rem 1.25rem minmax(0, 1fr);
       min-height: 1.65rem;
       padding: 0.15rem 0.35rem;
       user-select: none;
@@ -195,6 +196,21 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
       font-size: 0.82rem;
       text-align: center;
+    }
+
+    .tree-icon {
+      color: var(--muted);
+      font-family: "Material Symbols Rounded";
+      font-size: 1.05rem;
+      font-weight: normal;
+      font-style: normal;
+      line-height: 1;
+      text-rendering: optimizeLegibility;
+      text-transform: none;
+      white-space: nowrap;
+      word-wrap: normal;
+      -webkit-font-feature-settings: "liga";
+      -webkit-font-smoothing: antialiased;
     }
 
     .name {
@@ -516,6 +532,7 @@
       for (const entry of entries) {
         const item = document.createElement("li");
         const row = document.createElement("div");
+        const icon = document.createElement("span");
         const name = document.createElement("span");
         const twisty = document.createElement("span");
         const hasChildren = entry.kind === "directory" && entry.children.length > 0;
@@ -525,10 +542,12 @@
         row.title = entry.path;
         twisty.className = "twisty";
         twisty.textContent = hasChildren ? (startsOpen ? "-" : "+") : "";
+        icon.className = "tree-icon";
+        icon.textContent = iconFor(entry);
         name.className = "name";
         name.textContent = entry.name;
 
-        row.append(twisty, name);
+        row.append(twisty, icon, name);
         item.append(row);
 
         if (entry.kind === "directory") {
@@ -686,6 +705,25 @@
         yaml: "yaml",
         yml: "yaml",
       }[extensionFor(name)] || "";
+    }
+
+    function iconFor(entry) {
+      if (entry.kind === "directory") {
+        return "folder";
+      }
+
+      return {
+        css: "css",
+        html: "html",
+        js: "javascript",
+        json: "data_object",
+        md: "article",
+        py: "code",
+        sh: "terminal",
+        toml: "settings",
+        yaml: "data_object",
+        yml: "data_object",
+      }[extensionFor(entry.name)] || "description";
     }
 
     function hasPrismLanguage(language) {
