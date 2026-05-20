@@ -11,6 +11,8 @@ from src.bench.bundle import BundleWriter, ROLE_NAMES
 from src.bench.query import open_bundle, open_bundles
 from src.bench.report import main as report_main
 from src.bench.run import run_bundle
+from src.bench.runner import run_matrix
+from tests.test_runner import _matrix_config
 
 EXAMPLE_BUNDLE = Path("docs/examples/minimal.eval")
 
@@ -86,6 +88,17 @@ def test_report_prints_reduced_metrics_for_multiple_epochs(capsys, tmp_path):
     assert "Metrics" in output
     assert "+/-" in output
     assert "(n=3)" in output
+
+
+def test_report_prints_matrix_for_multi_model_multi_scenario_bundle(capsys, tmp_path):
+    bundle_path = run_matrix(_matrix_config(), root=tmp_path, run_id="matrix-report")
+
+    report_main([str(bundle_path)])
+
+    output = capsys.readouterr().out
+    assert "Matrix: 2 scenarios x 2 models x 2 epochs" in output
+    assert "constant_b" in output
+    assert "mech-a" in output
 
 
 def test_module_entrypoint_runs_report():

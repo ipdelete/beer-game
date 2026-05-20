@@ -93,9 +93,16 @@ def _user_prompt(view: PlayerView) -> str:
 
 
 class GABMAgent:
-    def __init__(self, role: str):
+    def __init__(
+        self,
+        role: str,
+        *,
+        config: dict | None = None,
+        cache: ResponseCache | None = None,
+    ):
         self.role = role
-        config = _MODEL_CONFIG or {}
+        config = config or _MODEL_CONFIG or {}
+        self.cache = cache
         self.endpoint = config.get("endpoint") or os.getenv(
             "LLM_ENDPOINT", DEFAULT_ENDPOINT
         )
@@ -145,7 +152,8 @@ class GABMAgent:
 
             try:
                 cache_key = self._cache_key(messages, ctx)
-                cached = _CACHE.fetch(cache_key) if _CACHE and cache_key else None
+                cache = self.cache if self.cache is not None else _CACHE
+                cached = cache.fetch(cache_key) if cache and cache_key else None
                 if cached is not None:
                     span.set_attribute("beergame.cache_hit", True)
                     response = _response_from_cache(cached)
@@ -166,8 +174,8 @@ class GABMAgent:
                 _set_if(span, "beergame.parse_ok", result.ok)
                 _set_if(span, "beergame.parse_strategy", result.strategy)
                 _set_if(span, "beergame.decision_int", decision)
-                if result.ok and cached is None and _CACHE and cache_key:
-                    _CACHE.store(cache_key, _response_to_cache(response))
+                if result.ok and cached is None and cache and cache_key:
+                    cache.store(cache_key, _response_to_cache(response))
                 return decision
             except Exception as e:  # pragma: no cover - network error path
                 span.record_exception(e)

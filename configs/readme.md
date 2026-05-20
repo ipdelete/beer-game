@@ -67,6 +67,14 @@ config or pass `bench run --no-cache` to disable it for a run. Pass
 responses. `--cache-dir` overrides `BEERGAME_CACHE_DIR`; otherwise the cache
 defaults to `~/.cache/beer-game`.
 
+## Matrix runs
+
+A config can include multiple scenarios and models. `bench run --config ...`
+runs the full `scenarios x models x epochs` matrix into one `.eval` bundle.
+`runner.parallel` controls worker count; `bench run --parallel N` can override
+it for a single invocation. Reusing the same `--run-id` resumes compatible
+bundles by skipping successful cells, while `--force` reruns from scratch.
+
 ## Scenario releases
 
 Every scenario must declare `release_date` in `YYYY-Qn` format. `removal_date`
