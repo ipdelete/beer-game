@@ -115,8 +115,96 @@ def test_gabm_decision_without_usage_writes_row_with_null_tokens():
     assert row["input_tokens"] is None
     assert row["output_tokens"] is None
     assert row["parse_ok"] is True
-    assert row["parse_strategy"] == "first_int"
+    assert row["parse_strategy"] == "strict_int"
     assert row["decision_int"] == 7
+
+
+def test_gabm_decision_uses_reasoning_when_content_is_empty():
+    writer = FakeWriter()
+    session = configure_telemetry(writer)
+    agent = GABMAgent("Retailer")
+    agent.client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=FakeCompletions(
+                FakeResponse(usage=None, content="", reasoning="maybe 3\nactually 9")
+            )
+        )
+    )
+    view = PlayerView(
+        role="Retailer",
+        week=1,
+        inventory=12,
+        backlog=0,
+        incoming_order=4,
+        shipment_received=4,
+        last_order_placed=4,
+        on_order=8,
+    )
+
+    try:
+        with decision_context(
+            run_id="run-1",
+            game_id="game-1",
+            scenario_id="step",
+            scenario_release="2026-Q2",
+            epoch=0,
+            week=1,
+            role="retailer",
+            llm_seed=123,
+            cache_hit=False,
+        ):
+            decision = agent.decide(view)
+    finally:
+        session.shutdown()
+
+    assert decision == 9
+    assert writer.rows[0]["parse_ok"] is True
+    assert writer.rows[0]["parse_strategy"] == "last_line_int"
+    assert writer.rows[0]["decision_int"] == 9
+
+
+def test_gabm_decision_implausible_parse_defaults_zero():
+    writer = FakeWriter()
+    session = configure_telemetry(writer)
+    agent = GABMAgent("Retailer")
+    agent.client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=FakeCompletions(
+                FakeResponse(usage=None, content="1001", reasoning=None)
+            )
+        )
+    )
+    view = PlayerView(
+        role="Retailer",
+        week=1,
+        inventory=12,
+        backlog=0,
+        incoming_order=4,
+        shipment_received=4,
+        last_order_placed=4,
+        on_order=8,
+    )
+
+    try:
+        with decision_context(
+            run_id="run-1",
+            game_id="game-1",
+            scenario_id="step",
+            scenario_release="2026-Q2",
+            epoch=0,
+            week=1,
+            role="retailer",
+            llm_seed=123,
+            cache_hit=False,
+        ):
+            decision = agent.decide(view)
+    finally:
+        session.shutdown()
+
+    assert decision == 0
+    assert writer.rows[0]["parse_ok"] is False
+    assert writer.rows[0]["parse_strategy"] == "strict_int"
+    assert writer.rows[0]["decision_int"] == 0
 
 
 def test_gabm_decision_error_writes_error_row_and_defaults_zero():
@@ -176,13 +264,13 @@ class RaisingCompletions:
 
 
 class FakeResponse:
-    def __init__(self, usage):
+    def __init__(self, usage, content="7", reasoning=None):
         self.id = "resp-1"
         self.model = "fake-model"
         self.usage = usage
         self.choices = [
             SimpleNamespace(
-                message=SimpleNamespace(content="7", reasoning=None),
+                message=SimpleNamespace(content=content, reasoning=reasoning),
                 finish_reason="stop",
             )
         ]

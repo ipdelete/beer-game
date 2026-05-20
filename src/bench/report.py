@@ -38,6 +38,8 @@ def print_report(con: duckdb.DuckDBPyConnection, bundle_path: str | Path) -> Non
     print()
     print_latency(con)
     print()
+    print_parse_strategies(con)
+    print()
     print_metrics(con)
 
 
@@ -115,6 +117,34 @@ def print_latency(con: duckdb.DuckDBPyConnection) -> None:
             print()
         print(f"Latency by role (model: {model}, mean / p95 in ms)")
         print(_format_table(["role", "mean", "p95"], _latency_rows(model_rows)))
+
+
+def print_parse_strategies(con: duckdb.DuckDBPyConnection) -> None:
+    rows = con.execute("""
+        SELECT
+          model_request,
+          coalesce(parse_strategy, 'n/a') AS parse_strategy,
+          count(*) AS calls
+        FROM decisions
+        GROUP BY model_request, parse_strategy
+        ORDER BY model_request, calls DESC, parse_strategy
+        """).fetchall()
+
+    grouped = _group_rows(rows)
+    if not grouped:
+        print("Parse strategies")
+        print("  n/a")
+        return
+
+    for index, (model, model_rows) in enumerate(grouped.items()):
+        if index:
+            print()
+        print(f"Parse strategies (model: {model})")
+        print(
+            _format_table(
+                ["strategy", "calls", "pct"], _parse_strategy_rows(model_rows)
+            )
+        )
 
 
 def print_metrics(con: duckdb.DuckDBPyConnection) -> None:
@@ -195,6 +225,16 @@ def _latency_rows(rows: list[tuple[Any, ...]]) -> list[list[str]]:
                 _format_number(round(p95_ms) if p95_ms is not None else None),
             ]
         )
+    return table_rows
+
+
+def _parse_strategy_rows(rows: list[tuple[Any, ...]]) -> list[list[str]]:
+    total = sum(row[2] for row in rows)
+    table_rows = []
+    for row in rows:
+        calls = row[2]
+        pct = 0 if total == 0 else (calls / total) * 100
+        table_rows.append([row[1], _format_number(calls), f"{pct:.1f}%"])
     return table_rows
 
 
