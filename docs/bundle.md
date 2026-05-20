@@ -68,6 +68,13 @@ The resolved config, after all `import`, `default`, and `overwrite` processing,
 is snapshotted into `manifest.json.config`. `manifest.json.config_hash` is a
 stable hash of that resolved config.
 
+GABM runs use a JSON response cache by default, keyed by endpoint, model,
+sampling config, full messages, scenario id and params hash, demand hash,
+prompt version, LLM seed, and epoch. Use `--no-cache` to disable reads and
+writes, `--refresh-cache` to bypass existing entries while storing fresh
+successful parses, and `--cache-dir` or `BEERGAME_CACHE_DIR` to choose the cache
+root.
+
 Metric functions live in `src.bench.metrics` and register themselves with the
 `@metric()` decorator. Registered metrics accept a DuckDB connection from
 `open_bundle()` or `open_bundles()` and return scalar values for reports and

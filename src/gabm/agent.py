@@ -9,18 +9,22 @@ bullwhip effect in novice human players.
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 from typing import Dict, List
 
 from opentelemetry.trace import SpanKind, Status, StatusCode
 from openai import OpenAI
 
 from ..bench import telemetry
+from ..bench.cache import CacheKey, ResponseCache
 from ..bench.parser import max_plausible_order_from_env, parse_decision
 from ..engine.state import PlayerRecord, PlayerView
 
 DEFAULT_ENDPOINT = "http://localhost:11434/v1"
 DEFAULT_MODEL = "mistral:latest"
+PROMPT_VERSION = "gabm-v1"
 _MODEL_CONFIG: dict | None = None
+_CACHE: ResponseCache | None = None
 
 
 _DOWNSTREAM = {
@@ -122,12 +126,13 @@ class GABMAgent:
                 _set_if(span, key, value)
             _set_beergame_attrs(span, view, ctx)
 
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": _user_prompt(view)},
+            ]
             request_kwargs = {
                 "model": self.model,
-                "messages": [
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": _user_prompt(view)},
-                ],
+                "messages": messages,
                 "temperature": self.temperature,
                 "max_tokens": 256,
                 "timeout": 60,
@@ -139,7 +144,14 @@ class GABMAgent:
                 _set_if(span, "gen_ai.request.seed", ctx.llm_seed)
 
             try:
-                response = self.client.chat.completions.create(**request_kwargs)
+                cache_key = self._cache_key(messages, ctx)
+                cached = _CACHE.fetch(cache_key) if _CACHE and cache_key else None
+                if cached is not None:
+                    span.set_attribute("beergame.cache_hit", True)
+                    response = _response_from_cache(cached)
+                else:
+                    span.set_attribute("beergame.cache_hit", False)
+                    response = self.client.chat.completions.create(**request_kwargs)
                 _set_response_attrs(span, response)
                 msg = _first_message(response)
                 content = (getattr(msg, "content", None) or "").strip() if msg else ""
@@ -154,6 +166,8 @@ class GABMAgent:
                 _set_if(span, "beergame.parse_ok", result.ok)
                 _set_if(span, "beergame.parse_strategy", result.strategy)
                 _set_if(span, "beergame.decision_int", decision)
+                if result.ok and cached is None and _CACHE and cache_key:
+                    _CACHE.store(cache_key, _response_to_cache(response))
                 return decision
             except Exception as e:  # pragma: no cover - network error path
                 span.record_exception(e)
@@ -164,6 +178,27 @@ class GABMAgent:
                 _set_if(span, "beergame.decision_int", 0)
                 print(f"[GABM:{self.role}] decision error: {e}; defaulting to 0")
                 return 0
+
+    def _cache_key(
+        self, messages: list[dict[str, str]], ctx: telemetry.DecisionContext | None
+    ) -> CacheKey | None:
+        if ctx is None:
+            return None
+        if ctx.scenario_params_hash is None or ctx.demand_hash is None:
+            return None
+        return CacheKey(
+            base_url=self.endpoint,
+            model=self.model,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            llm_seed=ctx.llm_seed,
+            messages=messages,
+            scenario_id=ctx.scenario_id,
+            scenario_params_hash=ctx.scenario_params_hash,
+            demand_hash=ctx.demand_hash,
+            prompt_version=ctx.prompt_version,
+            epoch=ctx.epoch,
+        )
 
 
 def _set_if(span, key: str, value) -> None:
@@ -270,7 +305,65 @@ def configure_model(config: dict | None) -> None:
     reset_state()
 
 
+def configure_cache(cache: ResponseCache | None) -> None:
+    """Configure the response cache used by future GABM agents."""
+
+    global _CACHE
+    _CACHE = cache
+
+
 def gabm_decision(view: PlayerView) -> int:
     if view.role not in _AGENTS:
         _AGENTS[view.role] = GABMAgent(view.role)
     return _AGENTS[view.role].decide(view)
+
+
+def _response_to_cache(response) -> dict:
+    usage = getattr(response, "usage", None)
+    message = _first_message(response)
+    return {
+        "id": getattr(response, "id", None),
+        "model": getattr(response, "model", None),
+        "choices": [
+            {
+                "finish_reason": _first_finish_reason(response),
+                "message": {
+                    "content": getattr(message, "content", None) if message else None,
+                    "reasoning": (
+                        getattr(message, "reasoning", None) if message else None
+                    ),
+                },
+            }
+        ],
+        "usage": {
+            "input_tokens": _get_first_attr(usage, "input_tokens", "prompt_tokens"),
+            "output_tokens": _get_first_attr(
+                usage, "output_tokens", "completion_tokens"
+            ),
+            "completion_tokens_details": {
+                "reasoning_tokens": _get_first_attr(
+                    getattr(usage, "completion_tokens_details", None),
+                    "reasoning_tokens",
+                )
+            },
+            "prompt_tokens_details": {
+                "cached_tokens": _get_first_attr(
+                    getattr(usage, "prompt_tokens_details", None), "cached_tokens"
+                )
+            },
+        },
+    }
+
+
+def _response_from_cache(payload: dict):
+    return _to_namespace(payload)
+
+
+def _to_namespace(value):
+    if isinstance(value, dict):
+        return SimpleNamespace(
+            **{key: _to_namespace(item) for key, item in value.items()}
+        )
+    if isinstance(value, list):
+        return [_to_namespace(item) for item in value]
+    return value

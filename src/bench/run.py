@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import time
 from pathlib import Path
@@ -17,12 +19,14 @@ from src.bench.bundle import (
     stable_hash_int,
     utc_now,
 )
+from src.bench.cache import ResponseCache
 from src.bench.config import load_config
 from src.bench.scenarios import filter_scenarios, parse_release
 from src.bench.telemetry import configure_telemetry, decision_context
 from src.engine.simulation import BeerGameEngine
 from src.engine.state import PlayerView
-from src.gabm.agent import DEFAULT_ENDPOINT, DEFAULT_MODEL
+from src.gabm.agent import DEFAULT_ENDPOINT, DEFAULT_MODEL, PROMPT_VERSION
+from src.gabm.agent import configure_cache as configure_gabm_cache
 from src.gabm.agent import configure_model as configure_gabm_model
 from src.gabm.agent import gabm_decision, reset_state as reset_gabm
 from src.mechanistic.agent import mechanistic_decision, reset_state as reset_mech
@@ -51,9 +55,22 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--active-release", type=str, default=None, help="Scenario release pin"
     )
+    parser.add_argument(
+        "--no-cache", action="store_true", help="Disable response cache"
+    )
+    parser.add_argument(
+        "--refresh-cache",
+        action="store_true",
+        help="Refresh response cache entries without reading existing entries",
+    )
+    parser.add_argument(
+        "--cache-dir", type=Path, default=None, help="Response cache dir"
+    )
     args = parser.parse_args(argv)
     if args.config is None and args.epochs < 1:
         parser.error("--epochs must be at least 1")
+    if args.no_cache and args.refresh_cache:
+        parser.error("--no-cache and --refresh-cache are mutually exclusive")
 
     bundle_path = run_bundle(
         turns=args.turns,
@@ -64,6 +81,9 @@ def main(argv: list[str] | None = None) -> None:
         epochs=args.epochs,
         config_path=args.config,
         active_release=args.active_release,
+        no_cache=args.no_cache,
+        refresh_cache=args.refresh_cache,
+        cache_dir=args.cache_dir,
     )
     print(bundle_path)
 
@@ -79,11 +99,16 @@ def run_bundle(
     config_path: Path | str | None = None,
     config: dict | None = None,
     active_release: str | None = None,
+    no_cache: bool = False,
+    refresh_cache: bool = False,
+    cache_dir: Path | str | None = None,
 ) -> Path:
     """Run one Beer Game and write an `.eval` bundle."""
 
     if config_path is not None and config is not None:
         raise ValueError("pass either config_path or config, not both")
+    if no_cache and refresh_cache:
+        raise ValueError("no_cache and refresh_cache are mutually exclusive")
     if config_path is not None:
         config = load_config(config_path)
 
@@ -124,6 +149,10 @@ def run_bundle(
         epochs = int(config["epochs"])
         run_seed = int(config["run_seed"])
         mode = _mode_from_config(config, model)
+    if mode == "gabm" and "prompt_version" not in config:
+        config = {**config, "prompt_version": PROMPT_VERSION}
+    if no_cache:
+        config = {**config, "cache": {**config.get("cache", {}), "enabled": False}}
 
     writer = BundleWriter(root, run_id=run_id)
     writer.start(models=[model], scenarios=[scenario], config=config)
@@ -131,6 +160,13 @@ def run_bundle(
     telemetry_session = configure_telemetry(writer) if mode == "gabm" else None
     if mode == "gabm":
         configure_gabm_model(model)
+        configure_gabm_cache(
+            ResponseCache(
+                cache_dir,
+                enabled=not no_cache and config.get("cache", {}).get("enabled", True),
+                refresh=refresh_cache,
+            )
+        )
     try:
         for epoch in range(epochs):
             _run_game(
@@ -141,17 +177,20 @@ def run_bundle(
                 mode=mode,
                 run_seed=run_seed,
                 epoch=epoch,
+                prompt_version=config.get("prompt_version"),
             )
     except Exception:
         if telemetry_session is not None:
             telemetry_session.shutdown()
         if mode == "gabm":
             configure_gabm_model(None)
+            configure_gabm_cache(None)
         raise
     if telemetry_session is not None:
         telemetry_session.shutdown()
     if mode == "gabm":
         configure_gabm_model(None)
+        configure_gabm_cache(None)
     return writer.finish()
 
 
@@ -164,6 +203,7 @@ def _run_game(
     mode: str,
     run_seed: int,
     epoch: int,
+    prompt_version: str | None,
 ) -> None:
     game_id = make_sortable_id("game")
     demand_seed = stable_hash_int(
@@ -217,6 +257,9 @@ def _run_game(
             "scenario_release": scenario.get("release_date") or ACTIVE_RELEASE,
             "epoch": epoch,
             "llm_seed": llm_seed,
+            "scenario_params_hash": _scenario_params_hash(scenario),
+            "demand_hash": _scenario_demand_hash(scenario, turns),
+            "prompt_version": prompt_version,
         },
     )
     engine = BeerGameEngine(decision_fn=decision_fn)
@@ -302,6 +345,35 @@ def _scenario(turns: int, release_date: str = ACTIVE_RELEASE) -> dict:
         "release_date": release_date,
         "removal_date": None,
     }
+
+
+def _scenario_params_hash(scenario: dict) -> str:
+    payload = json.dumps(
+        scenario.get("params", {}),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return hashlib.md5(payload, usedforsecurity=False).hexdigest()
+
+
+def _scenario_demand_hash(scenario: dict, turns: int) -> str:
+    pattern = scenario.get("demand_pattern")
+    params = scenario.get("params", {})
+    if pattern == "step":
+        low = int(params.get("low", 4))
+        high = int(params.get("high", 8))
+        step_week = int(params.get("step_week", 5))
+        demand = [low if week < step_week else high for week in range(1, turns + 1)]
+        return demand_hash(demand)
+    if pattern == "constant":
+        demand = [int(params["value"])] * turns
+        return demand_hash(demand)
+    payload = json.dumps(
+        {"pattern": pattern, "params": params, "turns": turns},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return hashlib.md5(payload, usedforsecurity=False).hexdigest()
 
 
 def _model(mode: str) -> dict:

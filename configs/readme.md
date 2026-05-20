@@ -59,6 +59,14 @@ Configs are snapshotted into shareable `.eval` bundles. Do not put API keys,
 authorization headers, tokens, or secrets in YAML. Use environment variables for
 credentials.
 
+## Response cache
+
+GABM runs use a JSON response cache by default. Set `cache.enabled: false` in a
+config or pass `bench run --no-cache` to disable it for a run. Pass
+`--refresh-cache` to ignore existing entries while writing fresh successful
+responses. `--cache-dir` overrides `BEERGAME_CACHE_DIR`; otherwise the cache
+defaults to `~/.cache/beer-game`.
+
 ## Scenario releases
 
 Every scenario must declare `release_date` in `YYYY-Qn` format. `removal_date`

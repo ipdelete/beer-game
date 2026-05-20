@@ -110,12 +110,30 @@ def test_bench_future_flags_fail_clearly(tmp_path):
             "1",
             "--runs-dir",
             str(tmp_path),
-            "--no-cache",
+            "--persist-traces",
         ],
     )
 
     assert result.exit_code != 0
-    assert "--no-cache is reserved for a follow-on issue" in result.output
+    assert "--persist-traces is reserved for a follow-on issue" in result.output
+
+
+def test_bench_run_cache_flags_are_mutually_exclusive(tmp_path):
+    result = CliRunner().invoke(
+        bench,
+        [
+            "run",
+            "--turns",
+            "1",
+            "--runs-dir",
+            str(tmp_path),
+            "--no-cache",
+            "--refresh-cache",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "--no-cache and --refresh-cache are mutually exclusive" in result.output
 
 
 def test_bench_compare_stub_mentions_issue_15(tmp_path):
