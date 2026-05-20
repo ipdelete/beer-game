@@ -137,7 +137,7 @@ class BundleWriter:
             "ended_at": None,
             "git_sha": _git_sha(),
             "git_dirty": _git_dirty(),
-            "prompt_version": None,
+            "prompt_version": config.get("prompt_version"),
             "config_hash": config_hash(config),
             "config": config,
             "active_release": config["active_release"],

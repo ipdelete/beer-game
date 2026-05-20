@@ -43,6 +43,9 @@ class DecisionContext:
     week: int
     role: str
     llm_seed: int | None
+    scenario_params_hash: str | None = None
+    demand_hash: str | None = None
+    prompt_version: str | None = None
     cache_hit: bool = False
     context_used: int | None = None
     context_window: int | None = None

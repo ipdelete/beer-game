@@ -52,6 +52,7 @@ def bench() -> None:
 @click.option("--model", type=str, default=None)
 @click.option("--no-cache", is_flag=True, default=False)
 @click.option("--refresh-cache", is_flag=True, default=False)
+@click.option("--cache-dir", type=click.Path(path_type=Path), default=None)
 @click.option("--persist-traces", is_flag=True, default=False)
 def run(
     mode: str,
@@ -66,6 +67,7 @@ def run(
     model: str | None,
     no_cache: bool,
     refresh_cache: bool,
+    cache_dir: Path | None,
     persist_traces: bool,
 ) -> None:
     """Wrap `python -m bench.run` with the stable CLI entry point."""
@@ -74,10 +76,10 @@ def run(
         raise unsupported("--scenario")
     if model is not None:
         raise unsupported("--model")
-    if no_cache:
-        raise unsupported("--no-cache")
-    if refresh_cache:
-        raise unsupported("--refresh-cache")
+    if no_cache and refresh_cache:
+        raise click.ClickException(
+            "--no-cache and --refresh-cache are mutually exclusive"
+        )
     if persist_traces:
         raise unsupported("--persist-traces")
 
@@ -87,6 +89,9 @@ def run(
             run_id=run_id,
             config_path=config,
             active_release=active_release,
+            no_cache=no_cache,
+            refresh_cache=refresh_cache,
+            cache_dir=cache_dir,
             **(
                 {}
                 if config is not None
