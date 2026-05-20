@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Repo Browser</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/themes/prism-tomorrow.min.css">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --border: color-mix(in srgb, CanvasText 18%, transparent);
+      --muted: color-mix(in srgb, CanvasText 58%, transparent);
+      --hover: color-mix(in srgb, Highlight 16%, transparent);
+      --selected: color-mix(in srgb, Highlight 28%, transparent);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: Canvas;
+      color: CanvasText;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 1rem;
+      height: 100vh;
+      padding: 1rem;
+    }
+
+    header,
+    .pane {
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      background: color-mix(in srgb, Canvas 96%, CanvasText 4%);
+    }
+
+    header {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1rem;
+      padding: 0.75rem 1rem;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+    }
+
+    h2 {
+      font-size: 1rem;
+    }
+
+    button {
+      border: 1px solid color-mix(in srgb, CanvasText 24%, transparent);
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font: inherit;
+      padding: 0.45rem 0.7rem;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    label {
+      align-items: center;
+      color: var(--muted);
+      display: inline-flex;
+      font-size: 0.9rem;
+      gap: 0.4rem;
+    }
+
+    input[type="search"] {
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      font: inherit;
+      min-width: 16rem;
+      padding: 0.45rem 0.65rem;
+    }
+
+    .status,
+    .muted,
+    .meta {
+      color: var(--muted);
+    }
+
+    .status {
+      font-size: 0.9rem;
+    }
+
+    main {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: minmax(20rem, 31rem) 1fr;
+      min-height: 0;
+    }
+
+    .pane {
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pane-header {
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 0.75rem;
+      justify-content: space-between;
+      padding: 0.85rem 1rem;
+    }
+
+    .file-controls {
+      align-items: center;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .small-button {
+      font-size: 0.85rem;
+      padding: 0.35rem 0.55rem;
+      white-space: nowrap;
+    }
+
+    .pane-body {
+      height: calc(100% - 3.45rem);
+      overflow: auto;
+      padding: 0.75rem;
+    }
+
+    .tree ul {
+      list-style: none;
+      margin: 0;
+      padding-left: 1rem;
+    }
+
+    .tree > ul {
+      padding-left: 0;
+    }
+
+    .entry {
+      align-items: center;
+      border-radius: 0.4rem;
+      display: grid;
+      gap: 0.35rem;
+      grid-template-columns: 1.25rem minmax(0, 1fr);
+      min-height: 1.65rem;
+      padding: 0.15rem 0.35rem;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .entry.directory,
+    .entry.file {
+      cursor: pointer;
+    }
+
+    .entry:hover,
+    .entry.selected {
+      background: var(--selected);
+    }
+
+    .entry:not(.selected):hover {
+      background: var(--hover);
+    }
+
+    .twisty {
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.82rem;
+      text-align: center;
+    }
+
+    .name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .children.collapsed {
+      display: none;
+    }
+
+    .content-header {
+      align-items: start;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      gap: 0.25rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: 0.85rem 1rem;
+    }
+
+    .content-title {
+      font-size: 1rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .tab {
+      background: transparent;
+      font-size: 0.9rem;
+      padding: 0.25rem 0.55rem;
+    }
+
+    .tab.active {
+      background: var(--selected);
+    }
+
+    .content-body {
+      height: calc(100% - 4.65rem);
+      overflow: auto;
+      padding: 1rem;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.9rem;
+    }
+
+    pre[class*="language-"],
+    code[class*="language-"] {
+      background: transparent;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.9rem;
+      text-shadow: none;
+    }
+
+    .markdown {
+      line-height: 1.55;
+      max-width: 76rem;
+    }
+
+    .markdown h1,
+    .markdown h2,
+    .markdown h3 {
+      margin: 1rem 0 0.5rem;
+    }
+
+    .markdown p,
+    .markdown ul,
+    .markdown ol,
+    .markdown pre {
+      margin: 0.6rem 0;
+    }
+
+    .markdown pre {
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      overflow: auto;
+      padding: 0.8rem;
+    }
+
+    .empty-state {
+      color: var(--muted);
+      padding: 0.25rem;
+    }
+
+    @media (max-width: 820px) {
+      .app {
+        height: auto;
+        min-height: 100vh;
+      }
+
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .pane {
+        min-height: 22rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <button id="pick-directory" type="button">Pick directory</button>
+      <button id="reload-directory" type="button" disabled>Reload</button>
+      <h1>Repo Browser</h1>
+      <span id="status" class="status">Choose a folder to list files.</span>
+      <label>
+        <input id="show-ignored" type="checkbox">
+        Show generated/noisy folders
+      </label>
+    </header>
+
+    <main>
+      <section class="pane">
+        <div class="pane-header">
+          <h2>Files</h2>
+          <div class="file-controls">
+            <button id="collapse-all" class="small-button" type="button" disabled>Collapse all</button>
+            <input id="filter" type="search" placeholder="Filter paths" disabled>
+          </div>
+        </div>
+        <div id="tree" class="pane-body tree">
+          <p class="empty-state">No directory selected.</p>
+        </div>
+      </section>
+
+      <section class="pane">
+        <div class="content-header">
+          <div>
+            <h2 id="content-title" class="content-title">Content</h2>
+            <p id="content-meta" class="meta">Select a text file to preview it.</p>
+          </div>
+          <div class="tabs">
+            <button id="preview-tab" class="tab active" type="button" disabled>Preview</button>
+            <button id="source-tab" class="tab" type="button" disabled>Source</button>
+          </div>
+        </div>
+        <div id="content" class="content-body muted">Select a text file to preview it.</div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script>
+    window.Prism = window.Prism || {};
+    window.Prism.manual = true;
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/components/prism-bash.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/components/prism-json.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/components/prism-markdown.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/components/prism-ini.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/components/prism-yaml.min.js"></script>
+  <script>
+    const GENERATED_NAMES = new Set([
+      ".git",
+      ".mypy_cache",
+      ".playwright",
+      ".playwright-cli",
+      ".pytest_cache",
+      ".ruff_cache",
+      ".tox",
+      ".venv",
+      "__pycache__",
+      "build",
+      "dist",
+      "node_modules",
+      "runs",
+    ]);
+    const MAX_PREVIEW_BYTES = 1024 * 1024;
+    const MARKDOWN_EXTENSIONS = new Set(["md", "markdown"]);
+
+    const pickButton = document.querySelector("#pick-directory");
+    const reloadButton = document.querySelector("#reload-directory");
+    const collapseAllButton = document.querySelector("#collapse-all");
+    const showIgnoredInput = document.querySelector("#show-ignored");
+    const filterInput = document.querySelector("#filter");
+    const statusEl = document.querySelector("#status");
+    const treeEl = document.querySelector("#tree");
+    const contentTitleEl = document.querySelector("#content-title");
+    const contentMetaEl = document.querySelector("#content-meta");
+    const contentEl = document.querySelector("#content");
+    const previewTab = document.querySelector("#preview-tab");
+    const sourceTab = document.querySelector("#source-tab");
+
+    let rootHandle = null;
+    let rootTree = null;
+    let selectedRow = null;
+    let selectedFile = null;
+    let selectedText = "";
+    let activeView = "preview";
+
+    pickButton.addEventListener("click", async () => {
+      if (!("showDirectoryPicker" in window)) {
+        statusEl.textContent = "Directory picker is not available in this browser.";
+        return;
+      }
+
+      try {
+        rootHandle = await window.showDirectoryPicker();
+        await loadRoot();
+      } catch (error) {
+        if (error.name === "AbortError") {
+          statusEl.textContent = "Directory selection canceled.";
+          return;
+        }
+        statusEl.textContent = `Could not read directory: ${error.message}`;
+      }
+    });
+
+    reloadButton.addEventListener("click", loadRoot);
+    collapseAllButton.addEventListener("click", collapseAll);
+    showIgnoredInput.addEventListener("change", () => rootTree && renderTree());
+    filterInput.addEventListener("input", () => rootTree && renderTree());
+    previewTab.addEventListener("click", () => switchView("preview"));
+    sourceTab.addEventListener("click", () => switchView("source"));
+
+    async function loadRoot() {
+      if (!rootHandle) {
+        return;
+      }
+
+      setBusy(true);
+      resetSelection();
+      statusEl.textContent = `Reading ${rootHandle.name}...`;
+
+      try {
+        rootTree = await readDirectory(rootHandle, rootHandle.name);
+        renderTree();
+        collapseAllButton.disabled = false;
+        reloadButton.disabled = false;
+        filterInput.disabled = false;
+        statusEl.textContent = `Loaded ${countFiles(rootTree)} files from ${rootHandle.name}.`;
+      } catch (error) {
+        statusEl.textContent = `Could not read directory: ${error.message}`;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function readDirectory(directoryHandle, path) {
+      const children = [];
+      for await (const [name, handle] of directoryHandle.entries()) {
+        const ignored = GENERATED_NAMES.has(name);
+        if (ignored && !showIgnoredInput.checked) {
+          continue;
+        }
+
+        const childPath = `${path}/${name}`;
+        if (handle.kind === "directory") {
+          children.push({
+            children: await readDirectory(handle, childPath).then((entry) => entry.children),
+            ignored,
+            kind: "directory",
+            name,
+            path: childPath,
+          });
+        } else {
+          children.push({ handle, ignored, kind: "file", name, path: childPath });
+        }
+      }
+
+      children.sort((a, b) => {
+        if (a.kind !== b.kind) {
+          return a.kind === "directory" ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+      return { children, kind: "directory", name: path.split("/").pop(), path };
+    }
+
+    function renderTree() {
+      const filter = filterInput.value.trim().toLowerCase();
+      const entries = filter ? filterEntries(rootTree.children, filter) : rootTree.children;
+
+      treeEl.classList.remove("muted");
+      treeEl.replaceChildren();
+
+      if (entries.length === 0) {
+        treeEl.append(emptyState("No matching files."));
+        return;
+      }
+
+      treeEl.append(renderEntries(entries, { depth: 0, forceOpen: Boolean(filter) }));
+      collapseAllButton.disabled = entries.length === 0;
+    }
+
+    function collapseAll() {
+      treeEl.querySelectorAll(".children").forEach((children) => {
+        children.classList.add("collapsed");
+      });
+      treeEl.querySelectorAll(".entry.directory .twisty").forEach((twisty) => {
+        if (twisty.textContent) {
+          twisty.textContent = "+";
+        }
+      });
+    }
+
+    function renderEntries(entries, options) {
+      const list = document.createElement("ul");
+
+      for (const entry of entries) {
+        const item = document.createElement("li");
+        const row = document.createElement("div");
+        const name = document.createElement("span");
+        const twisty = document.createElement("span");
+        const hasChildren = entry.kind === "directory" && entry.children.length > 0;
+        const startsOpen = options.forceOpen;
+
+        row.className = `entry ${entry.kind}`;
+        row.title = entry.path;
+        twisty.className = "twisty";
+        twisty.textContent = hasChildren ? (startsOpen ? "-" : "+") : "";
+        name.className = "name";
+        name.textContent = entry.name;
+
+        row.append(twisty, name);
+        item.append(row);
+
+        if (entry.kind === "directory") {
+          const childList = renderEntries(entry.children, {
+            depth: options.depth + 1,
+            forceOpen: options.forceOpen,
+          });
+          childList.className = startsOpen ? "children" : "children collapsed";
+
+          row.addEventListener("click", () => {
+            const collapsed = childList.classList.toggle("collapsed");
+            twisty.textContent = collapsed ? "+" : "-";
+          });
+          item.append(childList);
+        } else {
+          row.addEventListener("click", () => previewFile(entry, row));
+        }
+
+        list.append(item);
+      }
+
+      return list;
+    }
+
+    async function previewFile(entry, row) {
+      setSelectedRow(row);
+      selectedFile = entry;
+      selectedText = "";
+      activeView = "preview";
+      updateTabs();
+
+      contentTitleEl.textContent = entry.path;
+      contentMetaEl.textContent = "Loading...";
+      contentEl.className = "content-body muted";
+      contentEl.textContent = "Loading...";
+
+      try {
+        const file = await entry.handle.getFile();
+        contentMetaEl.textContent = `${formatBytes(file.size)} - ${file.type || "text/plain"}`;
+
+        if (file.size > MAX_PREVIEW_BYTES) {
+          contentEl.textContent = `File is ${formatBytes(file.size)}; skipping preview.`;
+          return;
+        }
+
+        selectedText = await file.text();
+        previewTab.disabled = false;
+        sourceTab.disabled = false;
+        renderSelectedFile();
+      } catch (error) {
+        contentMetaEl.textContent = "Could not read file.";
+        contentEl.textContent = error.message;
+      }
+    }
+
+    function renderSelectedFile() {
+      if (!selectedFile) {
+        return;
+      }
+
+      contentEl.replaceChildren();
+      contentEl.className = "content-body";
+
+      if (activeView === "preview" && isMarkdown(selectedFile.name) && window.marked && window.DOMPurify) {
+        const article = document.createElement("article");
+        article.className = "markdown";
+        article.innerHTML = DOMPurify.sanitize(marked.parse(selectedText));
+        contentEl.append(article);
+        return;
+      }
+
+      const pre = document.createElement("pre");
+      const code = document.createElement("code");
+      const language = languageFor(selectedFile.name);
+      if (language) {
+        pre.className = `language-${language}`;
+        code.className = `language-${language}`;
+      }
+
+      if (hasPrismLanguage(language)) {
+        code.innerHTML = Prism.highlight(selectedText, Prism.languages[language], language);
+      } else {
+        code.textContent = selectedText;
+      }
+
+      pre.append(code);
+      contentEl.append(pre);
+    }
+
+    function switchView(view) {
+      activeView = view;
+      updateTabs();
+      renderSelectedFile();
+    }
+
+    function updateTabs() {
+      previewTab.classList.toggle("active", activeView === "preview");
+      sourceTab.classList.toggle("active", activeView === "source");
+    }
+
+    function setSelectedRow(row) {
+      if (selectedRow) {
+        selectedRow.classList.remove("selected");
+      }
+      selectedRow = row;
+      selectedRow.classList.add("selected");
+    }
+
+    function resetSelection() {
+      selectedRow = null;
+      selectedFile = null;
+      selectedText = "";
+      activeView = "preview";
+      previewTab.disabled = true;
+      sourceTab.disabled = true;
+      updateTabs();
+      contentTitleEl.textContent = "Content";
+      contentMetaEl.textContent = "Select a text file to preview it.";
+      contentEl.className = "content-body muted";
+      contentEl.textContent = "Select a text file to preview it.";
+    }
+
+    function filterEntries(entries, filter) {
+      const matches = [];
+
+      for (const entry of entries) {
+        const pathMatches = entry.path.toLowerCase().includes(filter);
+        if (entry.kind === "directory") {
+          const children = filterEntries(entry.children, filter);
+          if (pathMatches || children.length > 0) {
+            matches.push({ ...entry, children });
+          }
+        } else if (pathMatches) {
+          matches.push(entry);
+        }
+      }
+
+      return matches;
+    }
+
+    function isMarkdown(name) {
+      return MARKDOWN_EXTENSIONS.has(extensionFor(name));
+    }
+
+    function languageFor(name) {
+      return {
+        css: "css",
+        html: "markup",
+        js: "javascript",
+        json: "json",
+        md: "markdown",
+        py: "python",
+        sh: "bash",
+        toml: "ini",
+        yaml: "yaml",
+        yml: "yaml",
+      }[extensionFor(name)] || "";
+    }
+
+    function hasPrismLanguage(language) {
+      return Boolean(
+        language &&
+        window.Prism &&
+        typeof Prism.highlight === "function" &&
+        Prism.languages &&
+        Prism.languages[language]
+      );
+    }
+
+    function extensionFor(name) {
+      const index = name.lastIndexOf(".");
+      return index === -1 ? "" : name.slice(index + 1).toLowerCase();
+    }
+
+    function countFiles(entry) {
+      if (entry.kind === "file") {
+        return 1;
+      }
+      return entry.children.reduce((total, child) => total + countFiles(child), 0);
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) {
+        return `${bytes} B`;
+      }
+      if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(1)} KB`;
+      }
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function setBusy(isBusy) {
+      pickButton.disabled = isBusy;
+      reloadButton.disabled = isBusy || !rootHandle;
+      collapseAllButton.disabled = isBusy || !rootTree;
+      showIgnoredInput.disabled = isBusy;
+      filterInput.disabled = isBusy || !rootTree;
+    }
+
+    function emptyState(message) {
+      const paragraph = document.createElement("p");
+      paragraph.className = "empty-state";
+      paragraph.textContent = message;
+      return paragraph;
+    }
+  </script>
+</body>
+</html>
