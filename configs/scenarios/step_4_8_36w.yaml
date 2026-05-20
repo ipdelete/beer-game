@@ -1,0 +1,13 @@
+scenario_id: step_4_8_36w
+demand_pattern: step
+params:
+  low: 4
+  high: 8
+  step_week: 5
+weeks: 36
+costs:
+  holding: 0.5
+  backlog: 1.0
+scenario_seed: 42
+release_date: "2026-Q1"
+removal_date: null

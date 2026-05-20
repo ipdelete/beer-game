@@ -1,0 +1,21 @@
+schema_version: "1.0.0"
+active_release: "2026-Q2"
+run_seed: 12345
+weeks: 36
+epochs: 1
+mode: mechanistic
+
+runner:
+  parallel: 1
+  persist_traces: false
+
+cache:
+  enabled: true
+
+scenarios:
+  - import: "scenarios/step_4_8_36w.yaml"
+
+models: []
+
+telemetry:
+  otlp_endpoint: null

@@ -17,10 +17,12 @@ from src.bench.bundle import (
     stable_hash_int,
     utc_now,
 )
+from src.bench.config import load_config
 from src.bench.telemetry import configure_telemetry, decision_context
 from src.engine.simulation import BeerGameEngine
 from src.engine.state import PlayerView
 from src.gabm.agent import DEFAULT_ENDPOINT, DEFAULT_MODEL
+from src.gabm.agent import configure_model as configure_gabm_model
 from src.gabm.agent import gabm_decision, reset_state as reset_gabm
 from src.mechanistic.agent import mechanistic_decision, reset_state as reset_mech
 
@@ -44,8 +46,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--run-id", type=str, default=None, help="Optional run id")
     parser.add_argument("--run-seed", type=int, default=12345, help="Top-level seed")
     parser.add_argument("--epochs", type=int, default=1, help="Repeated games to run")
+    parser.add_argument("--config", type=Path, default=None, help="Resolved run YAML")
     args = parser.parse_args(argv)
-    if args.epochs < 1:
+    if args.config is None and args.epochs < 1:
         parser.error("--epochs must be at least 1")
 
     bundle_path = run_bundle(
@@ -55,6 +58,7 @@ def main(argv: list[str] | None = None) -> None:
         run_id=args.run_id,
         run_seed=args.run_seed,
         epochs=args.epochs,
+        config_path=args.config,
     )
     print(bundle_path)
 
@@ -67,27 +71,49 @@ def run_bundle(
     run_id: str | None = None,
     run_seed: int = 12345,
     epochs: int = 1,
+    config_path: Path | str | None = None,
+    config: dict | None = None,
 ) -> Path:
     """Run one Beer Game and write an `.eval` bundle."""
 
-    if epochs < 1:
-        raise ValueError("epochs must be at least 1")
+    if config_path is not None and config is not None:
+        raise ValueError("pass either config_path or config, not both")
+    if config_path is not None:
+        config = load_config(config_path)
 
-    scenario = _scenario(turns)
-    model = _model(mode)
-    config = {
-        "active_release": ACTIVE_RELEASE,
-        "weeks": turns,
-        "epochs": epochs,
-        "mode": mode,
-        "run_seed": run_seed,
-        "scenarios": [scenario],
-        "models": [model],
-    }
+    if config is None:
+        if epochs < 1:
+            raise ValueError("epochs must be at least 1")
+        scenario = _scenario(turns)
+        model = _model(mode)
+        config = {
+            "schema_version": "1.0.0",
+            "active_release": ACTIVE_RELEASE,
+            "weeks": turns,
+            "epochs": epochs,
+            "mode": mode,
+            "run_seed": run_seed,
+            "runner": {"parallel": 1, "persist_traces": False},
+            "cache": {"enabled": True},
+            "scenarios": [scenario],
+            "models": [model],
+            "telemetry": {"otlp_endpoint": None},
+        }
+    else:
+        _ensure_single_config_game(config)
+        scenario = dict(config["scenarios"][0])
+        model = dict(config["models"][0])
+        turns = int(scenario.get("weeks") or config["weeks"])
+        epochs = int(config["epochs"])
+        run_seed = int(config["run_seed"])
+        mode = _mode_from_config(config, model)
+
     writer = BundleWriter(root, run_id=run_id)
     writer.start(models=[model], scenarios=[scenario], config=config)
 
     telemetry_session = configure_telemetry(writer) if mode == "gabm" else None
+    if mode == "gabm":
+        configure_gabm_model(model)
     try:
         for epoch in range(epochs):
             _run_game(
@@ -102,9 +128,13 @@ def run_bundle(
     except Exception:
         if telemetry_session is not None:
             telemetry_session.shutdown()
+        if mode == "gabm":
+            configure_gabm_model(None)
         raise
     if telemetry_session is not None:
         telemetry_session.shutdown()
+    if mode == "gabm":
+        configure_gabm_model(None)
     return writer.finish()
 
 
@@ -167,7 +197,7 @@ def _run_game(
             "run_id": writer.run_id,
             "game_id": game_id,
             "scenario_id": scenario["scenario_id"],
-            "scenario_release": ACTIVE_RELEASE,
+            "scenario_release": scenario.get("release_date") or ACTIVE_RELEASE,
             "epoch": epoch,
             "llm_seed": llm_seed,
         },
@@ -270,9 +300,28 @@ def _model(mode: str) -> dict:
         "id": os.getenv("LLM_MODEL", DEFAULT_MODEL),
         "provider": "openai-compatible",
         "endpoint": os.getenv("LLM_ENDPOINT", DEFAULT_ENDPOINT),
+        "model": os.getenv("LLM_MODEL", DEFAULT_MODEL),
         "temperature": 0.4,
         "top_p": None,
     }
+
+
+def _ensure_single_config_game(config: dict) -> None:
+    if not config.get("models"):
+        raise ValueError("config must define at least one model")
+    if not config.get("scenarios"):
+        raise ValueError("config must define at least one scenario")
+    if len(config["models"]) > 1 or len(config["scenarios"]) > 1:
+        raise ValueError(
+            "config-driven bench run supports one model and one scenario until #11"
+        )
+
+
+def _mode_from_config(config: dict, model: dict) -> str:
+    provider = model.get("provider")
+    if provider == "mechanistic":
+        return "mechanistic"
+    return config.get("mode") if config.get("mode") == "gabm" else "gabm"
 
 
 def _state_rows(run_id: str, game_id: str, engine: BeerGameEngine) -> list[dict]:

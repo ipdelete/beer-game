@@ -58,6 +58,16 @@ inside `runs/` or `BEERGAME_RUNS_DIR`. The `compare` command is present as the
 future issue #15 contract and exits non-zero until paired bootstrap significance
 lands.
 
+Runs can also be driven by layered YAML configs:
+
+```bash
+uv run bench run --config configs/runs/smoke.yaml
+```
+
+The resolved config, after all `import`, `default`, and `overwrite` processing,
+is snapshotted into `manifest.json.config`. `manifest.json.config_hash` is a
+stable hash of that resolved config.
+
 Metric functions live in `src.bench.metrics` and register themselves with the
 `@metric()` decorator. Registered metrics accept a DuckDB connection from
 `open_bundle()` or `open_bundles()` and return scalar values for reports and

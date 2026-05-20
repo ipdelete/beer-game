@@ -95,8 +95,9 @@ def stable_hash_int(parts: tuple[Any, ...]) -> int:
 def config_hash(config: dict[str, Any]) -> str:
     """Hash normalized run config for manifest provenance."""
 
-    payload = json.dumps(config, sort_keys=True, separators=(",", ":")).encode()
-    return "sha256:" + hashlib.sha256(payload).hexdigest()
+    from src.bench.config import resolved_config_hash
+
+    return resolved_config_hash(config)
 
 
 def demand_hash(demand: list[int]) -> str:
