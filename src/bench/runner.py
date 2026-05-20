@@ -24,6 +24,7 @@ from src.bench.bundle import (
     utc_now,
 )
 from src.bench.cache import ResponseCache
+from src.bench.demand import materialize_demand
 from src.bench.scenarios import filter_scenarios
 from src.bench.telemetry import configure_telemetry, decision_context
 from src.engine.simulation import BeerGameEngine
@@ -234,6 +235,12 @@ def _run_game(
     demand_seed = stable_hash_int(
         (run_seed, scenario["scenario_id"], scenario["scenario_seed"], epoch)
     )
+    customer_demand = materialize_demand(scenario, run_seed, epoch)
+    if len(customer_demand) != turns:
+        raise ValueError(
+            f"Materialized demand length {len(customer_demand)} does not match turns {turns}"
+        )
+    customer_demand_hash = demand_hash([int(value) for value in customer_demand])
     llm_seed = stable_hash_int((run_seed, scenario["scenario_id"], model["id"], epoch))
     decision_rows: list[dict] = []
 
@@ -284,11 +291,13 @@ def _run_game(
             "epoch": epoch,
             "llm_seed": llm_seed,
             "scenario_params_hash": _scenario_params_hash(scenario),
-            "demand_hash": _scenario_demand_hash(scenario, turns),
+            "demand_hash": customer_demand_hash,
             "prompt_version": prompt_version,
         },
     )
-    engine = BeerGameEngine(decision_fn=decision_fn)
+    engine = BeerGameEngine(
+        decision_fn=decision_fn, customer_demand=customer_demand.tolist()
+    )
     started = time.monotonic()
     status = "ok"
     error = None
@@ -320,7 +329,7 @@ def _run_game(
             "ended_at": ended_at,
             "status": status,
             "error": error,
-            "demand_hash": demand_hash(engine.order_history["Customer"]),
+            "demand_hash": customer_demand_hash,
             "total_cost": (
                 sum(engine.get_total_costs().values()) if status == "ok" else None
             ),
@@ -411,26 +420,6 @@ def _mode_for_model(model: dict) -> str:
 def _scenario_params_hash(scenario: dict) -> str:
     payload = json.dumps(
         scenario.get("params", {}),
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode()
-    return hashlib.md5(payload, usedforsecurity=False).hexdigest()
-
-
-def _scenario_demand_hash(scenario: dict, turns: int) -> str:
-    pattern = scenario.get("demand_pattern")
-    params = scenario.get("params", {})
-    if pattern == "step":
-        low = int(params.get("low", 4))
-        high = int(params.get("high", 8))
-        step_week = int(params.get("step_week", 5))
-        demand = [low if week < step_week else high for week in range(1, turns + 1)]
-        return demand_hash(demand)
-    if pattern == "constant":
-        demand = [int(params["value"])] * turns
-        return demand_hash(demand)
-    payload = json.dumps(
-        {"pattern": pattern, "params": params, "turns": turns},
         sort_keys=True,
         separators=(",", ":"),
     ).encode()

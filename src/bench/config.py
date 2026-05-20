@@ -17,6 +17,7 @@ from pydantic import (
     model_validator,
 )
 
+from src.bench.demand import validate_demand_params
 from src.bench.scenarios import parse_release
 
 RESERVED_LIST_POLICY = "_list_policy"
@@ -40,6 +41,11 @@ class ScenarioConfig(BaseModel):
     def validate_release_date(cls, value: str) -> str:
         parse_release(value)
         return value
+
+    @model_validator(mode="after")
+    def validate_demand(self) -> "ScenarioConfig":
+        validate_demand_params(self.demand_pattern, self.params)
+        return self
 
     @model_validator(mode="after")
     def validate_removal_date(self) -> "ScenarioConfig":

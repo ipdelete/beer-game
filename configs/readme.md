@@ -79,6 +79,21 @@ Use `bench compare <bundle> --baseline <model> --challenger <model>` to compare
 matrix results with paired bootstrap significance. The comparison pairs models
 by scenario and epoch, so keep matrix configs balanced when possible.
 
+## Demand patterns
+
+Scenarios choose a built-in `demand_pattern` and validated `params`:
+
+| Pattern | Params |
+|---|---|
+| `constant` | `value` |
+| `step` | `low`, `high`, `step_week` |
+| `ramp` | `start`, `end`, `start_week`, `end_week` |
+| `sinusoid` | `mean`, `amplitude`, `period_weeks`, optional `phase` |
+| `bounded_random` | `low`, `high` inclusive integer bounds |
+
+Random scenarios are seeded from `(run_seed, scenario_id, scenario_seed, epoch)`
+so models see the same demand for each scenario/epoch pair.
+
 ## Scenario releases
 
 Every scenario must declare `release_date` in `YYYY-Qn` format. `removal_date`

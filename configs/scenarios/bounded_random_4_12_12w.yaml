@@ -1,0 +1,12 @@
+scenario_id: bounded_random_4_12_12w
+demand_pattern: bounded_random
+params:
+  low: 4
+  high: 12
+weeks: 12
+costs:
+  holding: 0.5
+  backlog: 1.0
+scenario_seed: 103
+release_date: "2026-Q3"
+removal_date: null

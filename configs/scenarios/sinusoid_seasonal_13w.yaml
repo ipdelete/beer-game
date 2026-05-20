@@ -1,0 +1,14 @@
+scenario_id: sinusoid_seasonal_13w
+demand_pattern: sinusoid
+params:
+  mean: 8
+  amplitude: 3
+  period_weeks: 13
+  phase: 0
+weeks: 13
+costs:
+  holding: 0.5
+  backlog: 1.0
+scenario_seed: 102
+release_date: "2026-Q3"
+removal_date: null
