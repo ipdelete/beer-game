@@ -44,6 +44,18 @@ uv run python -m bench.report runs/<run_id>.eval
 The report intentionally uses plain ASCII tables so it works in terminals,
 logs, and CI without extra rendering support.
 
+Metric functions live in `src.bench.metrics` and register themselves with the
+`@metric()` decorator. Registered metrics accept a DuckDB connection from
+`open_bundle()` or `open_bundles()` and return scalar values for reports and
+future reducers. The built-in metrics are:
+
+| Metric | Definition | Edge cases |
+|---|---|---|
+| `total_cost` | Sum of `states.cost_week` across all rows. | `None` for empty state views. |
+| `bullwhip_ratio` | Mean per-game `Var(factory order_placed) / Var(retailer customer_demand)`. | Skips games with missing or zero customer-demand variance; `None` if no valid games remain. |
+| `parse_success_rate` | Fraction of decision rows where `parse_ok` is true. | `NULL` parse flags count as failures; `None` for empty decision views. |
+| `recovery_time` | Mean elapsed weeks from a step demand shock until system pressure stabilizes. | Only step scenarios are considered; `None` if no game recovers. |
+
 ## Schema versioning
 
 `manifest.json.schema_version` uses semantic versioning.
