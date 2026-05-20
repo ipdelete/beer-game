@@ -9,8 +9,13 @@ quantitative benchmark for local language models running under Ollama.
 
 ## Documents
 
+- **[Game instructions](./beer-game-instructions.md)** — canonical Beer Game
+  mechanics, rules, and educational framing.
 - **[Bundle schema](./bundle.md)** — the `.eval` artifact contract for
   manifest, JSONL, Parquet, seeds, and DuckDB queries.
+- **[Roadmap](./roadmap.md)** — active benchmark architecture direction.
+- **[Facilitator cheat sheet](./facilitator-cheatsheet.md)** and
+  **[player cheat sheet](./player-cheatsheet.md)** — classroom/run support.
 
 ## Historical leaderboard snapshot
 

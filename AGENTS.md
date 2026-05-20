@@ -7,7 +7,7 @@ is a four-tier supply-chain simulation: retailer, wholesaler, distributor, and
 factory. Its educational purpose is to show how structure produces behavior,
 especially the bullwhip effect.
 
-Use `ai_docs/beer-game-instructions.md` as the canonical reference for complete
+Use `docs/beer-game-instructions.md` as the canonical reference for complete
 game mechanics, rules, and educational framing.
 
 Preserve the core game constraints:
@@ -84,7 +84,7 @@ When asked to work a GitHub issue, the next issue, or backlog work:
    the issue number and title.
 4. Write a plan before coding.
 5. After the plan, run an explicit alignment pass:
-   - review `.ai-research/improvements.html`;
+   - review `docs/roadmap.md`;
    - review the next two relevant GitHub issues;
    - update the plan so this issue fits downstream consumers without
      overbuilding.

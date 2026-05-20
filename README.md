@@ -2,6 +2,14 @@
 
 A simple beer game simulation.
 
+## Documentation
+
+- [Game instructions](docs/beer-game-instructions.md) are the canonical mechanics
+  reference.
+- [Benchmark bundle schema](docs/bundle.md) documents the `.eval` artifact
+  contract.
+- [Roadmap](docs/roadmap.md) captures the active benchmark architecture plan.
+
 ## Setup
 
 ```bash

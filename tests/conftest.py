@@ -97,7 +97,7 @@ def full_simulation(fresh_simulation):
 
 @pytest.fixture
 def expected_week_snapshots():
-    """Expected values at key weeks from the legacy full-run fixture."""
+    """Expected values at key weeks from the classic 36-week simulation."""
     return {
         1: {
             "customer_order": 4,
@@ -241,7 +241,7 @@ def expected_week_snapshots():
 
 @pytest.fixture
 def expected_order_amplification():
-    """Expected order amplification from the legacy full-run fixture."""
+    """Expected order amplification from the classic 36-week simulation."""
     return {
         "Customer": {"min": 4, "max": 8, "avg": 7.6, "amplification": 1.0},
         "Retailer": {"min": 4, "max": 20, "avg": 11.6, "amplification": 4.0},
@@ -253,7 +253,7 @@ def expected_order_amplification():
 
 @pytest.fixture
 def expected_total_costs():
-    """Expected total costs from the legacy full-run fixture."""
+    """Expected total costs from the classic 36-week simulation."""
     return {
         "Retailer": 1109.00,
         "Wholesaler": 3169.00,

@@ -128,7 +128,7 @@ class TestCostCalculations:
 
 
 class TestSpecificWeekSnapshots:
-    """Test specific week snapshots against legacy full-run fixture values."""
+    """Test specific week snapshots against classic 36-week simulation values."""
 
     def test_week_1_snapshot(self, simulation_after_1_week, expected_week_snapshots):
         """Validate week 1 matches expected values."""
@@ -252,7 +252,7 @@ class TestTotalCostAccumulation:
         assert later_retailer_cost > initial_retailer_cost
 
     def test_final_total_costs(self, full_simulation, expected_total_costs):
-        """Final total costs match expected legacy full-run fixture values."""
+        """Final total costs match expected classic simulation values."""
         sim = full_simulation
         expected = expected_total_costs
 
