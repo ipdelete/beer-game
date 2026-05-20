@@ -282,49 +282,55 @@
 
     .ball {
       position: absolute;
-      bottom: 1.5rem;
-      right: 1.5rem;
-      width: min(6rem, 18vw);
-      aspect-ratio: 1;
+      bottom: 1.4rem;
+      right: 1.4rem;
+      width: 5.5rem;
+      height: 5.5rem;
       border-radius: 50%;
-      display: grid;
-      place-items: center;
-      color: #fff;
       background:
-        radial-gradient(circle at 35% 30%, #fff 0 0.45rem, transparent 0.5rem),
-        radial-gradient(circle at 55% 24%, #111 0 0.3rem, transparent 0.36rem),
-        radial-gradient(circle at 62% 42%, #111 0 0.32rem, transparent 0.38rem),
-        radial-gradient(circle at 42% 45%, #111 0 0.28rem, transparent 0.34rem),
-        linear-gradient(135deg, #00f5ff, #bc13fe 45%, #050208);
-      box-shadow: 0 0 1.2rem rgba(0,245,255,0.9), 0 0 2rem rgba(255,43,214,0.7), 0 0.6rem 0.8rem rgba(0,0,0,0.55);
-      font-size: 1.6rem;
+        radial-gradient(circle at 36% 30%, rgba(255,255,255,0.85) 0 0.5rem, transparent 0.55rem),
+        radial-gradient(circle at 55% 26%, #050208 0 0.28rem, transparent 0.32rem),
+        radial-gradient(circle at 65% 40%, #050208 0 0.3rem, transparent 0.34rem),
+        radial-gradient(circle at 44% 44%, #050208 0 0.26rem, transparent 0.3rem),
+        radial-gradient(circle at 35% 35%, #ff8af0, #bc13fe 55%, #1a0044 90%);
+      box-shadow:
+        0 0 1.2rem rgba(0,245,255,0.85),
+        0 0 2rem rgba(255,43,214,0.7),
+        0 0.5rem 0.8rem rgba(0,0,0,0.55);
       animation: roll 2.6s ease-in-out infinite alternate;
     }
 
     .pin {
       position: absolute;
-      width: 4.4rem;
-      height: 8.6rem;
-      border-radius: 50% 50% 38% 38% / 34% 34% 60% 60%;
-      background:
-        linear-gradient(180deg, transparent 0 32%, var(--pin-red) 32% 43%, transparent 43%),
-        radial-gradient(circle at 50% 16%, #fff 0 1.2rem, transparent 1.25rem),
-        linear-gradient(180deg, var(--pin), #b7fff9);
-      box-shadow: 0 0 0.8rem rgba(255,255,255,0.9), 0 0.6rem 0.9rem rgba(0,0,0,0.45);
-      color: #160923;
-      display: grid;
-      place-items: center;
-      padding-top: 2.8rem;
-      font-size: 0.72rem;
+      width: 4.6rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      filter: drop-shadow(0 0 0.5rem rgba(255,255,255,0.6)) drop-shadow(0 0.4rem 0.4rem rgba(0,0,0,0.55));
+    }
+
+    .pin svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .pin span {
+      padding: 0.1rem 0.4rem;
+      border-radius: 0.3rem;
+      color: #04000f;
+      background: rgba(255,255,255,0.92);
+      font-size: 0.62rem;
       font-weight: 1000;
-      text-align: center;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
     }
 
-    .retailer { top: 14%; left: 46%; transform: rotate(-4deg); }
-    .wholesaler { top: 30%; left: 30%; transform: rotate(7deg); }
-    .distributor { top: 30%; left: 62%; transform: rotate(-8deg); }
-    .factory { top: 46%; left: 46%; transform: rotate(4deg); }
+    .retailer { top: 6%; left: 50%; transform: translateX(-50%); }
+    .wholesaler { top: 30%; left: 18%; }
+    .distributor { top: 30%; right: 18%; }
+    .factory { top: 54%; left: 50%; transform: translateX(-50%); }
 
     main {
       position: relative;
@@ -538,11 +544,25 @@
         <div class="counter">SCORE: 00000042</div>
       </div>
       <div class="pin-deck" aria-label="Bowling pins labeled with Beer Game roles">
-        <div class="pin retailer">retailer</div>
-        <div class="pin wholesaler">wholesaler</div>
-        <div class="pin distributor">distributor</div>
-        <div class="pin factory">factory</div>
-        <div class="ball" aria-hidden="true">🎳</div>
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+          <defs>
+            <symbol id="bgb-pin" viewBox="0 0 60 100">
+              <path d="M30 4 C20 4 18 16 22 24 C25 30 22 34 18 40 C12 50 10 62 14 76 C17 86 22 94 30 96 C38 94 43 86 46 76 C50 62 48 50 42 40 C38 34 35 30 38 24 C42 16 40 4 30 4 Z" fill="url(#bgb-pin-body)" stroke="#1a0024" stroke-width="1.2"/>
+              <path d="M22 32 C25 30 35 30 38 32 L40 44 C36 42 24 42 20 44 Z" fill="#ff174f"/>
+              <ellipse cx="24" cy="14" rx="3.5" ry="5" fill="rgba(255,255,255,0.85)"/>
+            </symbol>
+            <linearGradient id="bgb-pin-body" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffffff"/>
+              <stop offset="0.6" stop-color="#f5f8ff"/>
+              <stop offset="1" stop-color="#b9e6ff"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="pin retailer"><svg viewBox="0 0 60 100"><use href="#bgb-pin"/></svg><span>Retailer</span></div>
+        <div class="pin wholesaler"><svg viewBox="0 0 60 100"><use href="#bgb-pin"/></svg><span>Wholesaler</span></div>
+        <div class="pin distributor"><svg viewBox="0 0 60 100"><use href="#bgb-pin"/></svg><span>Distributor</span></div>
+        <div class="pin factory"><svg viewBox="0 0 60 100"><use href="#bgb-pin"/></svg><span>Factory</span></div>
+        <div class="ball" aria-hidden="true"></div>
       </div>
     </section>
   </header>
