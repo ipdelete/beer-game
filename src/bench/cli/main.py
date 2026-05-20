@@ -11,7 +11,7 @@ from typing import Any
 
 import click
 
-from bench.cli._common import (
+from src.bench.cli._common import (
     iter_bundles,
     load_manifest,
     resolve_bundle,
@@ -77,7 +77,7 @@ def run(
     no_retry_errors: bool,
     persist_traces: bool,
 ) -> None:
-    """Wrap `python -m bench.run` with the stable CLI entry point."""
+    """Wrap `python -m src.bench.run` with the stable CLI entry point."""
 
     if scenario is not None:
         raise unsupported("--scenario")

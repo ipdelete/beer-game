@@ -14,7 +14,7 @@ from src.bench.run import run_bundle
 from src.bench.runner import run_matrix
 from tests.test_runner import _matrix_config
 
-EXAMPLE_BUNDLE = Path("docs/examples/minimal.eval")
+EXAMPLE_BUNDLE = Path("tests/fixtures/minimal.eval")
 
 
 def test_open_bundle_registers_all_canonical_views():
@@ -103,7 +103,7 @@ def test_report_prints_matrix_for_multi_model_multi_scenario_bundle(capsys, tmp_
 
 def test_module_entrypoint_runs_report():
     result = subprocess.run(
-        [sys.executable, "-m", "bench.report", str(EXAMPLE_BUNDLE)],
+        [sys.executable, "-m", "src.bench.report", str(EXAMPLE_BUNDLE)],
         check=True,
         capture_output=True,
         text=True,

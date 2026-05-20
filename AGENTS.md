@@ -7,9 +7,6 @@ is a four-tier supply-chain simulation: retailer, wholesaler, distributor, and
 factory. Its educational purpose is to show how structure produces behavior,
 especially the bullwhip effect.
 
-Use `ai_docs/beer-game-instructions.md` as the canonical reference for complete
-game mechanics, rules, and educational framing.
-
 Preserve the core game constraints:
 
 - Four roles: retailer, wholesaler, distributor, factory.
@@ -34,7 +31,7 @@ uv run src/main.py
 Run a benchmark bundle:
 
 ```bash
-uv run python -m bench.run --turns 1
+uv run python -m src.bench.run --turns 1
 ```
 
 ## Testing instructions
@@ -57,8 +54,8 @@ For bundle/telemetry changes, also run the real command path and inspect the
 generated `.eval` artifact:
 
 ```bash
-uv run python -m bench.run --mode mechanistic --turns 1 --root /tmp/beer-game-check --run-id check-mech
-uv run python -m bench.run --mode gabm --turns 1 --root /tmp/beer-game-check --run-id check-gabm
+uv run python -m src.bench.run --mode mechanistic --turns 1 --root /tmp/beer-game-check --run-id check-mech
+uv run python -m src.bench.run --mode gabm --turns 1 --root /tmp/beer-game-check --run-id check-gabm
 ```
 
 ## Code style and conventions
@@ -84,7 +81,6 @@ When asked to work a GitHub issue, the next issue, or backlog work:
    the issue number and title.
 4. Write a plan before coding.
 5. After the plan, run an explicit alignment pass:
-   - review `.ai-research/improvements.html`;
    - review the next two relevant GitHub issues;
    - update the plan so this issue fits downstream consumers without
      overbuilding.
@@ -114,6 +110,6 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ## Security and artifacts
 
 - Do not commit secrets, tokens, local `.env` files, or model credentials.
-- Do not commit generated run output under `runs/`.
+- Do not commit generated run output; default it to `/tmp`.
 - Temporary validation artifacts should go under `/tmp` unless the issue asks
   for a checked-in fixture.

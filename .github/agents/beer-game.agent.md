@@ -21,7 +21,7 @@ Before substantial repo work:
 
 You are an engineering partner for a Beer Game simulation and benchmark. Help preserve the educational supply-chain dynamics while improving the code, benchmark artifacts, documentation, and developer workflow.
 
-The canonical game reference is `ai_docs/beer-game-instructions.md`. Preserve the core constraints:
+Preserve the core constraints:
 
 - Four roles: `retailer`, `wholesaler`, `distributor`, `factory`.
 - Inventory cost is `$0.50` per case per week.
@@ -49,8 +49,8 @@ For code changes, run the relevant existing checks:
 - Full tests: `uv run pytest -q`
 - Black on touched Python files only: `uv run black --fast --check <paths>`
 - For bundle or telemetry changes, also run the real benchmark paths and inspect the generated `.eval` artifact:
-  - `uv run python -m bench.run --mode mechanistic --turns 1 --root /tmp/beer-game-check --run-id check-mech`
-  - `uv run python -m bench.run --mode gabm --turns 1 --root /tmp/beer-game-check --run-id check-gabm`
+  - `uv run python -m src.bench.run --mode mechanistic --turns 1 --root /tmp/beer-game-check --run-id check-mech`
+  - `uv run python -m src.bench.run --mode gabm --turns 1 --root /tmp/beer-game-check --run-id check-gabm`
 
 ## Issue workflow
 
@@ -58,7 +58,6 @@ When asked to work a GitHub issue or backlog item, GitHub Issues are the source 
 
 After the plan, run an explicit alignment pass:
 
-- Review `.ai-research/improvements.html`.
 - Review the next two relevant GitHub issues.
 - Update the plan so the current issue fits downstream consumers without overbuilding.
 

@@ -16,6 +16,7 @@ ACTIVE_RELEASE = "2026-Q2"
 SCENARIO_SEED = 42
 HOLDING_COST = 0.5
 BACKLOG_COST = 1.0
+DEFAULT_RUNS_ROOT = Path("/tmp/beer-game-runs")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -27,7 +28,9 @@ def main(argv: list[str] | None = None) -> None:
         default="mechanistic",
         help="Decision strategy to run",
     )
-    parser.add_argument("--root", type=Path, default=Path("runs"), help="Output root")
+    parser.add_argument(
+        "--root", type=Path, default=DEFAULT_RUNS_ROOT, help="Output root"
+    )
     parser.add_argument("--run-id", type=str, default=None, help="Optional run id")
     parser.add_argument("--run-seed", type=int, default=12345, help="Top-level seed")
     parser.add_argument("--epochs", type=int, default=1, help="Repeated games to run")
@@ -82,7 +85,7 @@ def run_bundle(
     *,
     turns: int = 36,
     mode: str = "mechanistic",
-    root: Path | str = Path("runs"),
+    root: Path | str = DEFAULT_RUNS_ROOT,
     run_id: str | None = None,
     run_seed: int = 12345,
     epochs: int = 1,

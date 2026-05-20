@@ -24,10 +24,9 @@ priority; do not create or maintain a separate local backlog queue.
    number and title.
 3. Write a plan before coding.
 4. Run an explicit alignment pass after the plan:
-   - review `.ai-research/improvements.html`;
    - review the next two relevant GitHub issues;
-   - update the plan so the current issue fits the roadmap and downstream
-     consumers without overbuilding.
+   - update the plan so the current issue fits downstream consumers without
+     overbuilding.
 5. For non-trivial work, ask the rubber-duck agent to critique the plan before
    implementation.
 6. Implement the current issue narrowly but completely.
@@ -37,7 +36,7 @@ priority; do not create or maintain a separate local backlog queue.
    - the real command path or artifact inspection relevant to the issue.
 8. After validation, run a tiny end-to-end smoke that exercises the new work and
    confirms existing behavior still looks sane. Prefer temporary artifacts under
-   `/tmp`, for example a short `bench.run` followed by `bench.report` and a
+   `/tmp`, for example a short `bench run` followed by `bench report` and a
    focused artifact query for benchmark changes.
 9. Commit, push, create a PR, squash-merge, delete the issue branch, and pull
    latest `master`.
