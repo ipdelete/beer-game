@@ -5,23 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Beer Game Benchmark</title>
   <meta name="description" content="A bowling alley GeoCities runbook for the Beer Game Benchmark.">
+  <link rel="icon" href="data:,">
   <style>
     :root {
-      --carpet: #160923;
-      --carpet2: #240b35;
-      --lane: #c8822f;
-      --lane-light: #ffd07a;
-      --pin: #fff9e8;
-      --pin-red: #cf102d;
-      --monitor: #071a2f;
-      --monitor-glow: #25f4ff;
-      --beer: #ffb000;
-      --beer-dark: #8d4b00;
-      --purple: #bc13fe;
+      --void: #04000f;
+      --midnight: #080530;
+      --lane: #10165f;
+      --lane-light: #7fffff;
+      --pin: #fff8ff;
+      --pin-red: #ff174f;
+      --monitor: #020824;
+      --monitor-glow: #00f5ff;
+      --beer: #ffe600;
+      --orange: #ff7a00;
+      --purple: #b300ff;
       --green: #39ff14;
       --pink: #ff2bd6;
-      --ink: #f8f4d8;
-      --shadow: #050208;
+      --ink: #f8fbff;
+      --shadow: #020008;
     }
 
     * { box-sizing: border-box; }
@@ -32,12 +33,14 @@
       color: var(--ink);
       font-family: "Comic Sans MS", "Comic Sans", "Trebuchet MS", cursive;
       background:
-        radial-gradient(circle at 15% 20%, rgba(255,43,214,0.35) 0 0.45rem, transparent 0.5rem),
-        radial-gradient(circle at 80% 30%, rgba(37,244,255,0.32) 0 0.5rem, transparent 0.56rem),
-        radial-gradient(circle at 45% 80%, rgba(57,255,20,0.28) 0 0.4rem, transparent 0.48rem),
-        repeating-linear-gradient(60deg, transparent 0 2.2rem, rgba(255,255,255,0.04) 2.2rem 2.5rem),
-        linear-gradient(135deg, var(--carpet), var(--carpet2) 45%, #050208);
-      background-size: 7rem 7rem, 9rem 9rem, 6rem 6rem, auto, auto;
+        radial-gradient(circle at 14% 16%, rgba(0,245,255,0.7) 0 0.28rem, transparent 0.34rem),
+        radial-gradient(circle at 82% 22%, rgba(255,43,214,0.68) 0 0.32rem, transparent 0.4rem),
+        radial-gradient(circle at 45% 72%, rgba(57,255,20,0.55) 0 0.24rem, transparent 0.34rem),
+        radial-gradient(circle at 62% 38%, rgba(255,230,0,0.5) 0 0.18rem, transparent 0.3rem),
+        repeating-linear-gradient(120deg, rgba(255,43,214,0.11) 0 0.28rem, transparent 0.28rem 2.6rem),
+        repeating-linear-gradient(60deg, rgba(0,245,255,0.1) 0 0.24rem, transparent 0.24rem 2.2rem),
+        linear-gradient(135deg, #060018, #140044 42%, #020008);
+      background-size: 8rem 8rem, 10rem 10rem, 7rem 7rem, 6rem 6rem, auto, auto, auto;
       line-height: 1.6;
       cursor: crosshair;
     }
@@ -48,11 +51,26 @@
       inset: 0;
       pointer-events: none;
       background:
-        linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px),
-        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
-      background-size: 14px 14px;
-      opacity: 0.28;
+        linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+        linear-gradient(transparent 0 48%, rgba(255,255,255,0.12) 49% 51%, transparent 52%);
+      background-size: 42px 42px, 42px 42px, 100% 5px;
+      opacity: 0.26;
       mix-blend-mode: screen;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto 0 0;
+      height: 45vh;
+      pointer-events: none;
+      background:
+        linear-gradient(to top, rgba(0,245,255,0.24), transparent 70%),
+        repeating-linear-gradient(90deg, transparent 0 3rem, rgba(255,43,214,0.2) 3rem 3.08rem),
+        repeating-linear-gradient(0deg, transparent 0 2.1rem, rgba(57,255,20,0.18) 2.1rem 2.2rem);
+      clip-path: polygon(0 100%, 100% 100%, 63% 0, 37% 0);
+      opacity: 0.7;
     }
 
     .top-marquee,
@@ -61,13 +79,16 @@
       left: 0;
       right: 0;
       z-index: 20;
-      padding: 0.35rem 0;
-      color: #fff200;
-      background: #050208;
-      border-block: 4px ridge var(--monitor-glow);
+      padding: 0.4rem 0;
+      color: var(--beer);
+      background:
+        repeating-linear-gradient(45deg, #050208 0 1.1rem, #240049 1.1rem 1.28rem),
+        #050208;
+      border-block: 4px solid var(--monitor-glow);
       font-size: 1rem;
       font-weight: 1000;
-      text-shadow: 0 0 0.3rem var(--monitor-glow), 2px 2px 0 #000;
+      text-shadow: 0 0 0.3rem var(--beer), 0 0 0.75rem var(--pink), 2px 2px 0 #000;
+      box-shadow: 0 0 1.4rem var(--monitor-glow);
     }
 
     .top-marquee { top: 0; }
@@ -76,7 +97,7 @@
     a {
       color: #fff200;
       font-weight: 900;
-      text-shadow: 0 0 0.35rem var(--beer);
+      text-shadow: 0 0 0.35rem var(--beer), 0 0 0.8rem var(--pink);
     }
 
     .hero {
@@ -96,11 +117,30 @@
       width: min(88rem, 120vw);
       height: 42rem;
       transform: translateX(-50%);
-      clip-path: polygon(42% 0, 58% 0, 92% 100%, 8% 100%);
+      clip-path: polygon(37% 0, 63% 0, 100% 100%, 0 100%);
       background:
-        repeating-linear-gradient(90deg, rgba(80,33,5,0.8) 0 0.5rem, transparent 0.5rem 6rem),
-        linear-gradient(90deg, #6c390f, var(--lane-light) 20% 80%, #6c390f);
-      box-shadow: 0 -1rem 4rem rgba(255,176,0,0.35);
+        radial-gradient(ellipse at 50% 0, rgba(255,255,255,0.7), transparent 18%),
+        repeating-linear-gradient(90deg, transparent 0 5.5rem, rgba(255,43,214,0.55) 5.5rem 5.75rem, transparent 5.75rem 6.4rem),
+        linear-gradient(90deg, #060022, #1932ff 15%, #18ffff 50%, #ff2bd6 85%, #060022);
+      box-shadow: 0 -1rem 5rem rgba(0,245,255,0.55), inset 0 0 5rem rgba(255,43,214,0.45);
+    }
+
+    .hero::after {
+      content: "AEROBIC COSMIC BOWL-A-THON";
+      position: absolute;
+      top: 5.4rem;
+      right: -7rem;
+      z-index: 0;
+      padding: 0.45rem 7rem;
+      transform: rotate(18deg);
+      color: #04000f;
+      background: linear-gradient(90deg, var(--green), var(--beer), var(--pink));
+      border-block: 0.35rem solid #fff;
+      font-family: Impact, Haettenschweiler, "Arial Black", sans-serif;
+      font-size: clamp(1rem, 2vw, 1.8rem);
+      letter-spacing: 0.08em;
+      text-shadow: 1px 1px 0 #fff;
+      box-shadow: 0 0 2rem rgba(255,43,214,0.8);
     }
 
     .hero-card {
@@ -112,20 +152,24 @@
       gap: 2rem;
       align-items: center;
       padding: clamp(1rem, 4vw, 2.6rem);
-      border: 8px outset #262bff;
+      border: 8px double var(--monitor-glow);
       background:
-        linear-gradient(180deg, rgba(7,26,47,0.97), rgba(5,2,8,0.96)),
-        repeating-linear-gradient(0deg, rgba(37,244,255,0.1) 0 2px, transparent 2px 7px);
+        radial-gradient(circle at 86% 14%, rgba(255,230,0,0.28), transparent 18%),
+        radial-gradient(circle at 18% 88%, rgba(255,43,214,0.3), transparent 23%),
+        linear-gradient(135deg, rgba(2,8,36,0.98), rgba(18,0,64,0.96) 55%, rgba(2,0,8,0.98)),
+        repeating-linear-gradient(0deg, rgba(0,245,255,0.14) 0 2px, transparent 2px 7px);
       box-shadow:
-        0 0 0 0.6rem #050208,
-        0 0 2rem var(--monitor-glow),
+        0 0 0 0.35rem #050208,
+        0 0 0 0.7rem var(--pink),
+        0 0 3rem var(--monitor-glow),
+        inset 0 0 3rem rgba(255,43,214,0.28),
         0 2.2rem 4rem rgba(0,0,0,0.65);
     }
 
     .scoreboard {
       display: inline-flex;
       padding: 0.35rem 0.7rem;
-      border: 4px inset #4b5cff;
+      border: 4px inset var(--monitor-glow);
       color: var(--green);
       background: #000;
       font-family: "Courier New", monospace;
@@ -137,20 +181,22 @@
 
     h1 {
       margin: 1rem 0;
-      color: var(--pin);
+      color: #fff;
       font-size: clamp(3.4rem, 9vw, 8rem);
       line-height: 0.86;
       letter-spacing: -0.05em;
       text-transform: uppercase;
       text-shadow:
-        0 0 0.25rem var(--pin),
-        0.08em 0.08em 0 #000,
-        0.14em 0.14em 0 var(--purple);
+        0 0 0.25rem #fff,
+        0 0 0.7rem var(--monitor-glow),
+        0.07em 0.07em 0 var(--pink),
+        0.13em 0.13em 0 var(--purple),
+        0.18em 0.18em 0 #000;
     }
 
     h1 span {
       display: block;
-      color: #fff200;
+      color: var(--beer);
       animation: neonBlink 1.1s steps(2, start) infinite;
     }
 
@@ -158,6 +204,8 @@
       max-width: 45rem;
       font-size: clamp(1.18rem, 2vw, 1.65rem);
       font-weight: 900;
+      color: #dffcff;
+      text-shadow: 0 0 0.45rem var(--monitor-glow), 2px 2px 0 #000;
     }
 
     .hero-actions {
@@ -173,16 +221,17 @@
       justify-content: center;
       min-height: 3.2rem;
       padding: 0.8rem 1.15rem;
-      border: 4px outset #f4e68a;
-      color: #160923;
-      background: linear-gradient(180deg, #fff9e8, #ffb000 55%, #db6400);
+      border: 4px outset #fff;
+      color: #04000f;
+      background: linear-gradient(135deg, var(--green), var(--beer) 38%, var(--orange) 68%, var(--pink));
       text-decoration: none;
-      box-shadow: 0 0.4rem 0 #000, 0 0 1rem rgba(255,176,0,0.55);
+      text-transform: uppercase;
+      box-shadow: 0 0.4rem 0 #000, 0 0 1.4rem rgba(255,43,214,0.75);
     }
 
     .button.secondary {
       color: #fff;
-      background: linear-gradient(180deg, #2735ff, #7d1dff 55%, #250759);
+      background: linear-gradient(135deg, #2735ff, #7d1dff 55%, #ff2bd6);
       text-shadow: 1px 1px 0 #000;
     }
 
@@ -195,9 +244,9 @@
 
     .web-badge {
       padding: 0.25rem 0.45rem;
-      border: 3px outset #aaa;
-      color: #fff;
-      background: #7d1dff;
+      border: 3px outset var(--monitor-glow);
+      color: #04000f;
+      background: linear-gradient(90deg, var(--monitor-glow), var(--green), var(--beer));
       font: 900 0.78rem Arial, sans-serif;
       text-transform: uppercase;
     }
@@ -221,12 +270,14 @@
       display: grid;
       place-items: center;
       overflow: hidden;
-      border: 8px groove var(--beer);
+      border: 8px groove var(--monitor-glow);
       border-radius: 0.6rem;
       background:
-        radial-gradient(circle at 50% 0, rgba(255,255,255,0.45), transparent 26%),
-        linear-gradient(180deg, #150810, #4f2104 55%, #c8822f);
-      box-shadow: inset 0 0 2rem rgba(0,0,0,0.75), 0 0 1.5rem rgba(255,176,0,0.45);
+        radial-gradient(circle at 50% 0, rgba(255,255,255,0.65), transparent 22%),
+        repeating-linear-gradient(90deg, transparent 0 2.8rem, rgba(0,245,255,0.35) 2.8rem 3rem),
+        repeating-linear-gradient(0deg, transparent 0 1.8rem, rgba(255,43,214,0.28) 1.8rem 1.95rem),
+        linear-gradient(180deg, #020824, #130044 55%, #07001b);
+      box-shadow: inset 0 0 3rem rgba(0,0,0,0.75), 0 0 2.4rem rgba(0,245,255,0.65);
     }
 
     .ball {
@@ -243,8 +294,8 @@
         radial-gradient(circle at 55% 24%, #111 0 0.6rem, transparent 0.7rem),
         radial-gradient(circle at 62% 42%, #111 0 0.65rem, transparent 0.75rem),
         radial-gradient(circle at 42% 45%, #111 0 0.55rem, transparent 0.65rem),
-        linear-gradient(135deg, #3214ff, #bc13fe 45%, #050208);
-      box-shadow: 0 0 1.4rem rgba(188,19,254,0.8), 0 1rem 1rem rgba(0,0,0,0.55);
+        linear-gradient(135deg, #00f5ff, #bc13fe 45%, #050208);
+      box-shadow: 0 0 1.6rem rgba(0,245,255,0.9), 0 0 2.4rem rgba(255,43,214,0.75), 0 1rem 1rem rgba(0,0,0,0.55);
       font-size: 2.4rem;
       animation: roll 2.6s ease-in-out infinite alternate;
     }
@@ -257,8 +308,8 @@
       background:
         linear-gradient(180deg, transparent 0 32%, var(--pin-red) 32% 43%, transparent 43%),
         radial-gradient(circle at 50% 16%, #fff 0 1.2rem, transparent 1.25rem),
-        linear-gradient(180deg, var(--pin), #d7d0bd);
-      box-shadow: 0 0.6rem 0.9rem rgba(0,0,0,0.45);
+        linear-gradient(180deg, var(--pin), #b7fff9);
+      box-shadow: 0 0 0.8rem rgba(255,255,255,0.9), 0 0.6rem 0.9rem rgba(0,0,0,0.45);
       color: #160923;
       display: grid;
       place-items: center;
@@ -285,26 +336,38 @@
     .panel {
       margin: 1.25rem 0;
       padding: clamp(1.25rem, 3vw, 2rem);
-      border: 5px ridge #27133a;
-      border-radius: 0.55rem;
-      color: #170a02;
+      border: 5px solid var(--monitor-glow);
+      border-radius: 1.1rem;
+      color: #eaffff;
       background:
-        linear-gradient(180deg, rgba(255,249,232,0.95), rgba(255,208,122,0.92)),
-        repeating-linear-gradient(90deg, transparent 0 3rem, rgba(80,33,5,0.1) 3rem 3.4rem);
-      box-shadow: 0 0.8rem 0 #050208, 0 0 1rem rgba(37,244,255,0.18);
+        radial-gradient(circle at 0 0, rgba(255,43,214,0.32), transparent 22%),
+        radial-gradient(circle at 100% 0, rgba(57,255,20,0.24), transparent 20%),
+        linear-gradient(135deg, rgba(2,8,36,0.96), rgba(13,0,58,0.94) 58%, rgba(2,0,8,0.98)),
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0 2px, transparent 2px 8px);
+      box-shadow:
+        0 0.55rem 0 #050208,
+        0 0 0 0.22rem var(--pink),
+        0 0 1.9rem rgba(0,245,255,0.55),
+        inset 0 0 2rem rgba(255,43,214,0.16);
     }
 
     .panel.hot {
       color: var(--ink);
       background:
-        linear-gradient(180deg, rgba(7,26,47,0.98), rgba(22,9,35,0.98)),
-        repeating-linear-gradient(0deg, rgba(37,244,255,0.12) 0 2px, transparent 2px 8px);
-      border-color: var(--monitor-glow);
+        radial-gradient(circle at 100% 18%, rgba(255,230,0,0.28), transparent 18%),
+        linear-gradient(135deg, rgba(12,0,56,0.98), rgba(1,18,58,0.98)),
+        repeating-linear-gradient(90deg, rgba(0,245,255,0.14) 0 2px, transparent 2px 10px);
+      border-color: var(--beer);
+      box-shadow:
+        0 0.55rem 0 #050208,
+        0 0 0 0.22rem var(--green),
+        0 0 2rem rgba(255,230,0,0.45),
+        inset 0 0 2rem rgba(0,245,255,0.2);
     }
 
     .panel.hot .callout,
     .panel.hot .mini-card {
-      color: #170a02;
+      color: #04000f;
     }
 
     .scene-title {
@@ -316,6 +379,9 @@
       font-size: clamp(1.75rem, 4vw, 3rem);
       line-height: 1;
       letter-spacing: -0.04em;
+      color: var(--beer);
+      text-shadow: 0 0 0.5rem var(--beer), 0.08em 0.08em 0 var(--pink), 0.14em 0.14em 0 #000;
+      text-transform: uppercase;
     }
 
     .badge {
@@ -325,21 +391,22 @@
       min-height: 3.2rem;
       padding: 0.25rem 0.7rem;
       border-radius: 50%;
-      color: #160923;
-      background: var(--pin);
-      border: 0.45rem solid var(--pin-red);
+      color: #04000f;
+      background: radial-gradient(circle, #fff 0 42%, var(--beer) 43% 58%, var(--pink) 59%);
+      border: 0.45rem solid var(--monitor-glow);
       font-weight: 1000;
-      box-shadow: 0 0.3rem 0 #000;
+      box-shadow: 0 0.3rem 0 #000, 0 0 1rem var(--monitor-glow);
     }
 
     .callout {
       margin: 1rem 0;
       padding: 1rem 1.1rem;
-      border: 4px dashed var(--pin-red);
-      color: #120804;
-      background: #fff9e8;
+      border: 4px dashed var(--green);
+      color: #04000f;
+      background: linear-gradient(135deg, rgba(0,245,255,0.96), rgba(57,255,20,0.92), rgba(255,230,0,0.92));
       font-size: 1.15rem;
       font-weight: 900;
+      box-shadow: 0 0 1rem rgba(57,255,20,0.6);
     }
 
     .grid {
@@ -350,18 +417,19 @@
 
     .mini-card {
       padding: 1rem;
-      border: 3px outset var(--beer);
-      color: #120804;
-      background: rgba(255,249,232,0.9);
+      border: 3px outset var(--pink);
+      color: #04000f;
+      background: linear-gradient(135deg, rgba(0,245,255,0.95), rgba(255,230,0,0.92));
+      font-weight: 900;
     }
 
     pre {
       overflow-x: auto;
       padding: 1rem;
-      border: 4px inset #4153ff;
+      border: 4px inset var(--monitor-glow);
       color: var(--green);
       background: #02060b;
-      box-shadow: inset 0 0 1rem rgba(37,244,255,0.24);
+      box-shadow: inset 0 0 1rem rgba(0,245,255,0.36), 0 0 1.1rem rgba(255,43,214,0.38);
     }
 
     code {
@@ -373,13 +441,13 @@
       width: 100%;
       border-collapse: collapse;
       overflow: hidden;
-      box-shadow: 0 0 0 4px #050208;
+      box-shadow: 0 0 0 4px #050208, 0 0 1.2rem var(--pink);
     }
 
     .tools th,
     .tools td {
       padding: 0.8rem;
-      border-bottom: 2px solid rgba(5,2,8,0.22);
+      border-bottom: 2px solid rgba(0,245,255,0.28);
       text-align: left;
     }
 
@@ -390,7 +458,7 @@
     }
 
     .tools tr:nth-child(even) td {
-      background: rgba(255,176,0,0.18);
+      background: rgba(255,43,214,0.16);
     }
 
     .under-construction {
@@ -398,7 +466,7 @@
       padding: 0.75rem;
       border: 5px dashed #000;
       color: #000;
-      background: repeating-linear-gradient(45deg, #ff0 0 1rem, #000 1rem 2rem);
+      background: repeating-linear-gradient(45deg, var(--beer) 0 1rem, var(--pink) 1rem 2rem, var(--green) 2rem 3rem);
       text-align: center;
       font-size: 1.35rem;
       font-weight: 1000;
@@ -409,7 +477,8 @@
       text-align: center;
       color: var(--pin);
       background:
-        radial-gradient(circle at 50% 0, rgba(255,176,0,0.45), transparent 30%),
+        radial-gradient(circle at 50% 0, rgba(255,230,0,0.45), transparent 30%),
+        radial-gradient(circle at 15% 70%, rgba(255,43,214,0.4), transparent 24%),
         linear-gradient(180deg, #071a2f, #050208);
       border-color: var(--beer);
     }
@@ -417,7 +486,7 @@
     .finale .scene-title {
       justify-content: center;
       color: #fff200;
-      text-shadow: 0 0 0.45rem var(--beer), 0.08em 0.08em 0 #000;
+      text-shadow: 0 0 0.45rem var(--beer), 0.08em 0.08em 0 var(--pink), 0.14em 0.14em 0 #000;
     }
 
     .finale p {
@@ -444,15 +513,15 @@
   </style>
 </head>
 <body>
-  <marquee class="top-marquee" behavior="alternate" scrollamount="14">🎳 BEER GAME BENCHMARK LEAGUE NIGHT 🎳 BEST VIEWED BESIDE A CRT SCOREBOARD 🎳 THE DUDE ABIDES 🎳</marquee>
+  <marquee class="top-marquee" behavior="alternate" scrollamount="14">🎳 BLACKLIGHT BEER GAME BENCHMARK 🎳 COSMIC LANES OPEN 🎳 LEG WARMERS OPTIONAL 🎳</marquee>
   <marquee class="bottom-marquee" scrollamount="10">🍺 RESPECT THE DELAYS 🍺 FEAR THE BULLWHIP 🍺 OUTPUT GOES IN /tmp 🍺 NO ROOT FOLDER CONFETTI 🍺</marquee>
 
   <header class="hero">
     <section class="hero-card" aria-labelledby="title">
       <div>
-        <span class="scoreboard">LANE 4: SUPPLY CHAIN OPEN BOWL</span>
+        <span class="scoreboard">LANE 4: COSMIC SUPPLY CHAIN</span>
         <h1 id="title"><span>Beer Game</span> Benchmark</h1>
-        <p class="tagline"><span class="blink">HOT NEW!</span> A neon runbook for measuring whether local models can play Sterman's Beer Game without rolling a gutter ball into the bullwhip effect.</p>
+        <p class="tagline"><span class="blink">HOT NEW!</span> A blacklight runbook for measuring whether local models can play Sterman's Beer Game without grapevining straight into the bullwhip effect.</p>
         <div class="hero-actions">
           <a class="button" href="#quickstart">Start frame 1</a>
           <a class="button secondary" href="#report">Scoreboard report</a>
@@ -460,7 +529,7 @@
         </div>
         <div class="badges" aria-label="Fake bowling web badges">
           <span class="web-badge">No frames!</span>
-          <span class="web-badge">Shoe rental</span>
+          <span class="web-badge">Sweatbands</span>
           <span class="web-badge">Under construction</span>
           <span class="web-badge">No bumpers</span>
           <span class="web-badge">/tmp certified</span>
@@ -479,23 +548,23 @@
 
   <main>
     <section class="panel hot">
-      <h2 class="scene-title"><span class="badge">!</span> Welcome to lane 7, benchmark brotha</h2>
-      <p>This page was spiritually uploaded from a snack bar kiosk between league frames. It has CRT glow, carpet that should be illegal, and exactly one serious message: run the benchmark, read the bundle, keep the repo clean.</p>
+      <h2 class="scene-title"><span class="badge">!</span> Welcome to lane 7, cosmic benchmark brotha</h2>
+      <p>This page was spiritually uploaded from a blacklight snack bar during an 80s workout video. It has CRT glow, neon carpet that should be illegal, and exactly one serious message: run the benchmark, read the bundle, keep the repo clean.</p>
       <div class="under-construction">🚧 ALWAYS UNDER CONSTRUCTION / ALWAYS OUTPUT TO /tmp 🚧</div>
     </section>
 
     <section class="panel" id="quickstart">
-      <h2 class="scene-title"><span class="badge">1</span> Lace up the shoes</h2>
+      <h2 class="scene-title"><span class="badge">1</span> Lace up the cosmic shoes</h2>
       <p>Clone the repo, install the Python environment, and keep the beverage clear of the keyboard. This is the Beer Game Benchmark. It simulates Sterman's four-role supply chain and scores models by what the system actually does.</p>
       <div class="callout">The benchmark name is <strong>Beer Game Benchmark</strong>. The game is retailer → wholesaler → distributor → factory. The enemy is the bullwhip effect.</div>
       <pre><code>cd ~/src/beer-game
 uv sync</code></pre>
-      <p>If that works, you are standing on the approach. The pins are nervous.</p>
+      <p>If that works, you are standing on the approach under ultraviolet judgment. The pins are nervous.</p>
     </section>
 
     <section class="panel hot">
       <h2 class="scene-title"><span class="badge">2</span> Roll a one-frame smoke test</h2>
-      <p>Run the smallest mechanistic bundle first. No model server, no drama, no weird root-folder confetti.</p>
+      <p>Run the smallest mechanistic bundle first. No model server, no drama, no weird root-folder confetti, no Richard Simmons yelling over the telemetry.</p>
       <pre><code>uv run bench run --mode mechanistic --turns 1 --run-id smoke-mech</code></pre>
       <p>By default, generated bundles land here:</p>
       <pre><code>/tmp/beer-game-runs/smoke-mech.eval</code></pre>
@@ -506,7 +575,7 @@ uv sync</code></pre>
       <h2 class="scene-title"><span class="badge">3</span> Run the real config</h2>
       <p>The checked-in smoke config proves layered YAML resolution, scenario imports, model imports, and bundle writing all still tie the room together.</p>
       <pre><code>uv run bench run --config configs/runs/smoke.yaml --run-id config-smoke</code></pre>
-      <p>Want to put outputs somewhere else? Say so explicitly, like an adult wearing bowling shoes:</p>
+      <p>Want to put outputs somewhere else? Say so explicitly, like an adult wearing bowling shoes and electric-pink wristbands:</p>
       <pre><code>uv run bench run \
   --config configs/runs/smoke.yaml \
   --runs-dir /tmp/beer-game-night \
@@ -530,7 +599,7 @@ uv sync</code></pre>
 
     <section class="panel">
       <h2 class="scene-title"><span class="badge">5</span> Bring in a model</h2>
-      <p>For GABM mode, point the benchmark at an OpenAI-compatible local endpoint. Ollama is the usual house ball.</p>
+      <p>For GABM mode, point the benchmark at an OpenAI-compatible local endpoint. Ollama is the usual house ball glowing under the blacklight.</p>
       <pre><code>LLM_ENDPOINT="http://localhost:11434/v1" \
 LLM_MODEL="mistral:latest" \
 uv run bench run --mode gabm --turns 1 --run-id smoke-gabm</code></pre>
@@ -539,12 +608,12 @@ uv run bench run --mode gabm --turns 1 --run-id smoke-gabm</code></pre>
 
     <section class="panel hot">
       <h2 class="scene-title"><span class="badge">6</span> Compare two bowlers</h2>
-      <p>When a bundle has paired model results across the same scenarios and epochs, compare them with bootstrap significance. Science, but with rental shoes.</p>
+      <p>When a bundle has paired model results across the same scenarios and epochs, compare them with bootstrap significance. Science, but with rental shoes and synth drums.</p>
       <pre><code>uv run bench compare /tmp/beer-game-runs/&lt;run_id&gt;.eval \
   --baseline model-a \
   --challenger model-b \
   --metric total_cost</code></pre>
-      <p>Matched pairs matter. Same scenarios. Same epochs. Same demand seeds. No funny business from lane 12.</p>
+      <p>Matched pairs matter. Same scenarios. Same epochs. Same demand seeds. No funny business from lane 12, even if lane 12 has a fog machine.</p>
     </section>
 
     <section class="panel">
@@ -572,7 +641,7 @@ uv run bench run --mode gabm --turns 1 --run-id smoke-gabm</code></pre>
         <li>Do not commit generated CSVs, PNGs, caches, logs, or local model output.</li>
         <li>Small fixtures belong under <code>docs/examples/</code> only when they are intentional.</li>
       </ol>
-      <p><code>/tmp</code> means "this machine, this run, disposable." Local. Cozy. Repo-safe.</p>
+      <p><code>/tmp</code> means "this machine, this run, disposable." Local. Glowing. Repo-safe.</p>
     </section>
 
     <section class="panel">
