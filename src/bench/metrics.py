@@ -3,13 +3,28 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import duckdb
 
+from src.bench import reducers
+
 MetricFn = Callable[[duckdb.DuckDBPyConnection], Any]
+ReducerFn = Callable[[list[float]], float]
 
 _METRIC_REGISTRY: dict[str, MetricFn] = {}
+DEFAULT_REDUCER_SEED = 0
+
+
+@dataclass(frozen=True)
+class ReducedMetric:
+    """Reduced metric value with uncertainty and source epoch values."""
+
+    value: float | None
+    error: float | None
+    n: int
+    values: list[float]
 
 
 def metric(name: str | None = None) -> Callable[[MetricFn], MetricFn]:
@@ -40,6 +55,53 @@ def run_metrics(
     if unknown:
         raise KeyError(f"Unknown metrics: {', '.join(unknown)}")
     return {name: _METRIC_REGISTRY[name](con) for name in metric_names}
+
+
+def metric_epoch_values(con: duckdb.DuckDBPyConnection, name: str) -> list[Any]:
+    """Run a metric once per epoch, preserving epoch order."""
+
+    if name not in _METRIC_REGISTRY:
+        raise KeyError(f"Unknown metric: {name}")
+    values = []
+    for epoch in _epochs(con):
+        epoch_con = _epoch_connection(con, epoch)
+        values.append(_METRIC_REGISTRY[name](epoch_con))
+    return values
+
+
+def run_metric_reducers(
+    con: duckdb.DuckDBPyConnection,
+    reducer_config: dict[str, tuple[ReducerFn, ReducerFn | None]] | None = None,
+    *,
+    seed: int = DEFAULT_REDUCER_SEED,
+) -> dict[str, ReducedMetric]:
+    """Reduce per-epoch metric values with configurable point/error reducers."""
+
+    config = reducer_config or {}
+    reduced = {}
+    for name in list_metrics():
+        point_reducer, error_reducer = config.get(
+            name, (reducers.mean, reducers.bootstrap_stderr)
+        )
+        valid_values = [
+            float(value)
+            for value in metric_epoch_values(con, name)
+            if isinstance(value, int | float)
+        ]
+        if not valid_values:
+            reduced[name] = ReducedMetric(value=None, error=None, n=0, values=[])
+            continue
+
+        error = None
+        if len(valid_values) > 1 and error_reducer is not None:
+            error = _call_error_reducer(error_reducer, valid_values, seed)
+        reduced[name] = ReducedMetric(
+            value=point_reducer(valid_values),
+            error=error,
+            n=len(valid_values),
+            values=valid_values,
+        )
+    return reduced
 
 
 @metric()
@@ -132,6 +194,85 @@ def total_cost(con: duckdb.DuckDBPyConnection) -> float | None:
 
     value = con.execute("SELECT sum(cost_week) FROM states").fetchone()[0]
     return None if value is None else float(value)
+
+
+def epoch_count(con: duckdb.DuckDBPyConnection) -> int:
+    """Return the number of distinct epochs in the games view."""
+
+    return con.execute("SELECT count(DISTINCT epoch) FROM games").fetchone()[0]
+
+
+def _epochs(con: duckdb.DuckDBPyConnection) -> list[int]:
+    return [
+        int(row[0])
+        for row in con.execute(
+            "SELECT DISTINCT epoch FROM games ORDER BY epoch"
+        ).fetchall()
+    ]
+
+
+def _epoch_connection(
+    con: duckdb.DuckDBPyConnection, epoch: int
+) -> duckdb.DuckDBPyConnection:
+    filtered = duckdb.connect()
+    has_bundle_id = "bundle_id" in _view_columns(con, "games")
+
+    _copy_query(
+        filtered, "manifest", con.execute("SELECT * FROM manifest").to_arrow_table()
+    )
+    _copy_query(
+        filtered,
+        "scenarios",
+        con.execute("SELECT * FROM scenarios").to_arrow_table(),
+    )
+    _copy_query(
+        filtered,
+        "games",
+        con.execute("SELECT * FROM games WHERE epoch = ?", [epoch]).to_arrow_table(),
+    )
+    _copy_query(
+        filtered,
+        "decisions",
+        con.execute(
+            "SELECT * FROM decisions WHERE epoch = ?", [epoch]
+        ).to_arrow_table(),
+    )
+
+    if has_bundle_id:
+        states_sql = """
+            SELECT states.*
+            FROM states
+            JOIN games USING (bundle_id, game_id)
+            WHERE games.epoch = ?
+            """
+    else:
+        states_sql = """
+            SELECT states.*
+            FROM states
+            JOIN games USING (game_id)
+            WHERE games.epoch = ?
+            """
+    _copy_query(
+        filtered,
+        "states",
+        con.execute(states_sql, [epoch]).to_arrow_table(),
+    )
+    return filtered
+
+
+def _copy_query(
+    con: duckdb.DuckDBPyConnection, view_name: str, arrow_table: Any
+) -> None:
+    source_name = f"{view_name}_source"
+    con.register(source_name, arrow_table)
+    con.execute(f"CREATE TABLE {view_name} AS SELECT * FROM {source_name}")
+    con.unregister(source_name)
+
+
+def _call_error_reducer(reducer_fn: ReducerFn, values: list[float], seed: int) -> float:
+    if reducer_fn is reducers.bootstrap_stderr:
+        return reducers.bootstrap_stderr(values, seed=seed)
+    return reducer_fn(values)
 
 
 def _game_key_columns(con: duckdb.DuckDBPyConnection, view_name: str) -> list[str]:

@@ -56,6 +56,20 @@ future reducers. The built-in metrics are:
 | `parse_success_rate` | Fraction of decision rows where `parse_ok` is true. | `NULL` parse flags count as failures; `None` for empty decision views. |
 | `recovery_time` | Mean elapsed weeks from a step demand shock until system pressure stabilizes. | Only step scenarios are considered; `None` if no game recovers. |
 
+Runs can repeat the same scenario/model pair across epochs:
+
+```bash
+uv run python -m bench.run --mode mechanistic --turns 6 --epochs 5
+```
+
+Each epoch writes a separate `games.jsonl` row and carries the epoch number into
+`decisions.parquet`. The report reduces per-epoch metric values with `mean` and
+Inspect-style `bootstrap_stderr`, printing `value +/- stderr (n=K)` when more
+than one epoch has a valid metric value. With one epoch, it keeps the plain
+single-value metric output. The current step demand is deterministic, so
+`demand_seed` is recorded for future procedural scenarios but does not yet alter
+the generated demand series.
+
 ## Schema versioning
 
 `manifest.json.schema_version` uses semantic versioning.

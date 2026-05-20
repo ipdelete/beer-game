@@ -52,6 +52,27 @@ def test_run_bundle_writes_expected_parquet_schemas_and_rows(tmp_path):
     assert states.num_rows == 8
 
 
+def test_run_bundle_epochs_write_one_game_per_epoch(tmp_path):
+    bundle_path = run_bundle(turns=2, root=tmp_path, run_id="test-run", epochs=3)
+
+    manifest = json.loads((bundle_path / "manifest.json").read_text())
+    games = [
+        json.loads(line)
+        for line in (bundle_path / "games.jsonl").read_text().splitlines()
+    ]
+    decisions = pq.read_table(bundle_path / "decisions.parquet").to_pylist()
+    states = pq.read_table(bundle_path / "states.parquet").to_pylist()
+
+    assert manifest["config"]["epochs"] == 3
+    assert [game["epoch"] for game in games] == [0, 1, 2]
+    assert len({game["game_id"] for game in games}) == 3
+    assert len({game["llm_seed"] for game in games}) == 3
+    assert len({game["demand_seed"] for game in games}) == 3
+    assert {row["epoch"] for row in decisions} == {0, 1, 2}
+    assert len(decisions) == 3 * 2 * 4
+    assert len(states) == 3 * 2 * 4
+
+
 def test_state_customer_demand_only_on_retailer_rows(tmp_path):
     bundle_path = run_bundle(turns=1, root=tmp_path, run_id="test-run")
     states = pq.read_table(bundle_path / "states.parquet").to_pylist()

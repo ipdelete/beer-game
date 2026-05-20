@@ -11,7 +11,12 @@ from typing import Any
 import duckdb
 
 from src.bench.bundle import ROLE_NAMES
-from src.bench.metrics import run_metrics
+from src.bench.metrics import (
+    ReducedMetric,
+    epoch_count,
+    run_metric_reducers,
+    run_metrics,
+)
 from src.bench.query import open_bundle
 
 
@@ -113,10 +118,17 @@ def print_latency(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def print_metrics(con: duckdb.DuckDBPyConnection) -> None:
-    metrics = run_metrics(con)
-    rows = [
-        [name, _format_metric_value(name, value)] for name, value in metrics.items()
-    ]
+    if epoch_count(con) > 1:
+        metrics = run_metric_reducers(con)
+        rows = [
+            [name, _format_reduced_metric_value(name, value)]
+            for name, value in metrics.items()
+        ]
+    else:
+        metrics = run_metrics(con)
+        rows = [
+            [name, _format_metric_value(name, value)] for name, value in metrics.items()
+        ]
     print("Metrics")
     print(_format_table(["metric", "value"], rows))
 
@@ -254,6 +266,15 @@ def _format_metric_value(name: str, value: Any) -> str:
     if isinstance(value, int):
         return f"{value:,}"
     return str(value)
+
+
+def _format_reduced_metric_value(name: str, metric: ReducedMetric) -> str:
+    if metric.value is None:
+        return "n/a"
+    value = _format_metric_value(name, metric.value)
+    if metric.error is None:
+        return f"{value} (n={metric.n})"
+    return f"{value} +/- {metric.error:,.2f} (n={metric.n})"
 
 
 if __name__ == "__main__":

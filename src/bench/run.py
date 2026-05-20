@@ -43,7 +43,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--root", type=Path, default=Path("runs"), help="Output root")
     parser.add_argument("--run-id", type=str, default=None, help="Optional run id")
     parser.add_argument("--run-seed", type=int, default=12345, help="Top-level seed")
+    parser.add_argument("--epochs", type=int, default=1, help="Repeated games to run")
     args = parser.parse_args(argv)
+    if args.epochs < 1:
+        parser.error("--epochs must be at least 1")
 
     bundle_path = run_bundle(
         turns=args.turns,
@@ -51,6 +54,7 @@ def main(argv: list[str] | None = None) -> None:
         root=args.root,
         run_id=args.run_id,
         run_seed=args.run_seed,
+        epochs=args.epochs,
     )
     print(bundle_path)
 
@@ -62,15 +66,19 @@ def run_bundle(
     root: Path | str = Path("runs"),
     run_id: str | None = None,
     run_seed: int = 12345,
+    epochs: int = 1,
 ) -> Path:
     """Run one Beer Game and write an `.eval` bundle."""
+
+    if epochs < 1:
+        raise ValueError("epochs must be at least 1")
 
     scenario = _scenario(turns)
     model = _model(mode)
     config = {
         "active_release": ACTIVE_RELEASE,
         "weeks": turns,
-        "epochs": 1,
+        "epochs": epochs,
         "mode": mode,
         "run_seed": run_seed,
         "scenarios": [scenario],
@@ -79,11 +87,43 @@ def run_bundle(
     writer = BundleWriter(root, run_id=run_id)
     writer.start(models=[model], scenarios=[scenario], config=config)
 
-    game_id = make_sortable_id("game")
-    demand_seed = stable_hash_int((run_seed, scenario["scenario_id"], SCENARIO_SEED, 0))
-    llm_seed = stable_hash_int((run_seed, scenario["scenario_id"], model["id"], 0))
-
     telemetry_session = configure_telemetry(writer) if mode == "gabm" else None
+    try:
+        for epoch in range(epochs):
+            _run_game(
+                writer=writer,
+                scenario=scenario,
+                model=model,
+                turns=turns,
+                mode=mode,
+                run_seed=run_seed,
+                epoch=epoch,
+            )
+    except Exception:
+        if telemetry_session is not None:
+            telemetry_session.shutdown()
+        raise
+    if telemetry_session is not None:
+        telemetry_session.shutdown()
+    return writer.finish()
+
+
+def _run_game(
+    *,
+    writer: BundleWriter,
+    scenario: dict,
+    model: dict,
+    turns: int,
+    mode: str,
+    run_seed: int,
+    epoch: int,
+) -> None:
+    game_id = make_sortable_id("game")
+    demand_seed = stable_hash_int(
+        (run_seed, scenario["scenario_id"], scenario["scenario_seed"], epoch)
+    )
+    llm_seed = stable_hash_int((run_seed, scenario["scenario_id"], model["id"], epoch))
+
     decision_rows: list[dict] = []
 
     def record_decision(view: PlayerView, decision: int) -> None:
@@ -92,7 +132,7 @@ def run_bundle(
                 "run_id": writer.run_id,
                 "game_id": game_id,
                 "scenario_id": scenario["scenario_id"],
-                "epoch": 0,
+                "epoch": epoch,
                 "week": view.week,
                 "role": _role_name(view.role),
                 "model_request": model["id"],
@@ -128,7 +168,7 @@ def run_bundle(
             "game_id": game_id,
             "scenario_id": scenario["scenario_id"],
             "scenario_release": ACTIVE_RELEASE,
-            "epoch": 0,
+            "epoch": epoch,
             "llm_seed": llm_seed,
         },
     )
@@ -143,16 +183,12 @@ def run_bundle(
     except Exception as exc:
         status = "error"
         error = f"{type(exc).__name__}: {exc}"
-        if telemetry_session is not None:
-            telemetry_session.shutdown()
         raise
     finally:
         wall_seconds = time.monotonic() - started
 
     ended_at = utc_now()
-    if telemetry_session is not None:
-        telemetry_session.shutdown()
-    else:
+    if mode != "gabm":
         writer.append_decisions(decision_rows)
     writer.append_states(_state_rows(writer.run_id, game_id, engine))
     writer.append_game(
@@ -161,7 +197,7 @@ def run_bundle(
             "run_id": writer.run_id,
             "scenario_id": scenario["scenario_id"],
             "model": model["id"],
-            "epoch": 0,
+            "epoch": epoch,
             "demand_seed": demand_seed,
             "llm_seed": llm_seed,
             "started_at": writer.started_at,
@@ -175,7 +211,6 @@ def run_bundle(
             "wall_seconds": wall_seconds,
         }
     )
-    return writer.finish()
 
 
 def _decision_fn(
