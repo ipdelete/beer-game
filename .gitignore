@@ -198,3 +198,6 @@ cython_debug/
 *.png
 tournament_results/
 runs/
+
+# Local browser automation scratch files
+.playwright-cli/

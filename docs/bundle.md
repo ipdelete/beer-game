@@ -26,6 +26,24 @@ directory is later wrapped as a ZIP archive.
 A minimal checked-in example bundle is available at
 [`docs/examples/minimal.eval/`](./examples/minimal.eval/).
 
+Bundles can be opened through the DuckDB helper:
+
+```python
+from src.bench.query import open_bundle
+
+con = open_bundle("runs/<run_id>.eval")
+con.execute("SELECT count(*) FROM decisions").fetchone()
+```
+
+For a first plain-text summary, run:
+
+```bash
+uv run python -m bench.report runs/<run_id>.eval
+```
+
+The report intentionally uses plain ASCII tables so it works in terminals,
+logs, and CI without extra rendering support.
+
 ## Schema versioning
 
 `manifest.json.schema_version` uses semantic versioning.
@@ -238,6 +256,12 @@ not use Python's built-in `hash()`.
 ```
 
 ## DuckDB examples
+
+`src.bench.query.open_bundle(path)` registers the canonical views `manifest`,
+`scenarios`, `games`, `decisions`, and `states` for one bundle.
+`src.bench.query.open_bundles(glob_pattern)` registers the same views across
+multiple bundle directories and adds a `bundle_id` column derived from each
+bundle directory name without the `.eval` suffix.
 
 Cost per model:
 
