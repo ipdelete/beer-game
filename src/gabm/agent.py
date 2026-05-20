@@ -20,6 +20,7 @@ from ..engine.state import PlayerRecord, PlayerView
 
 DEFAULT_ENDPOINT = "http://localhost:11434/v1"
 DEFAULT_MODEL = "mistral:latest"
+_MODEL_CONFIG: dict | None = None
 
 
 _DOWNSTREAM = {
@@ -90,8 +91,18 @@ def _user_prompt(view: PlayerView) -> str:
 class GABMAgent:
     def __init__(self, role: str):
         self.role = role
-        self.endpoint = os.getenv("LLM_ENDPOINT", DEFAULT_ENDPOINT)
-        self.model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
+        config = _MODEL_CONFIG or {}
+        self.endpoint = config.get("endpoint") or os.getenv(
+            "LLM_ENDPOINT", DEFAULT_ENDPOINT
+        )
+        self.model = (
+            config.get("model")
+            or config.get("id")
+            or os.getenv("LLM_MODEL", DEFAULT_MODEL)
+        )
+        self.temperature = config.get("temperature", 0.4)
+        self.top_p = config.get("top_p")
+        self.context_window = config.get("context_window")
         self.client = OpenAI(base_url=self.endpoint, api_key="ollama")
         self.system_prompt = _system_prompt(role)
         self.max_plausible_order = max_plausible_order_from_env()
@@ -105,7 +116,8 @@ class GABMAgent:
             _set_if(span, "gen_ai.operation.name", "chat")
             _set_if(span, "gen_ai.provider.name", provider)
             _set_if(span, "gen_ai.request.model", self.model)
-            _set_if(span, "gen_ai.request.temperature", 0.4)
+            _set_if(span, "gen_ai.request.temperature", self.temperature)
+            _set_if(span, "gen_ai.request.top_p", self.top_p)
             for key, value in telemetry.server_attrs(self.endpoint).items():
                 _set_if(span, key, value)
             _set_beergame_attrs(span, view, ctx)
@@ -116,10 +128,12 @@ class GABMAgent:
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": _user_prompt(view)},
                 ],
-                "temperature": 0.4,
+                "temperature": self.temperature,
                 "max_tokens": 256,
                 "timeout": 60,
             }
+            if self.top_p is not None:
+                request_kwargs["top_p"] = self.top_p
             if ctx and ctx.llm_seed is not None:
                 request_kwargs["seed"] = ctx.llm_seed
                 _set_if(span, "gen_ai.request.seed", ctx.llm_seed)
@@ -246,6 +260,14 @@ _AGENTS: Dict[str, GABMAgent] = {}
 def reset_state() -> None:
     """Reset cached agents; useful when env vars change between runs."""
     _AGENTS.clear()
+
+
+def configure_model(config: dict | None) -> None:
+    """Configure future GABM agents with a resolved model config."""
+
+    global _MODEL_CONFIG
+    _MODEL_CONFIG = config
+    reset_state()
 
 
 def gabm_decision(view: PlayerView) -> int:

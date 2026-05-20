@@ -1,0 +1,6 @@
+id: mechanistic
+provider: mechanistic
+endpoint: null
+model: mechanistic
+temperature: null
+top_p: null

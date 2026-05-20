@@ -1,0 +1,7 @@
+id: qwen-local
+provider: openai-compatible
+base_url: "http://localhost:11434/v1"
+model: "qwen3.5:9b"
+temperature: 0.4
+top_p: 0.95
+context_window: 32768

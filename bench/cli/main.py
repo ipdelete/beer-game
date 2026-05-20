@@ -68,8 +68,6 @@ def run(
 ) -> None:
     """Wrap `python -m bench.run` with the stable CLI entry point."""
 
-    if config is not None:
-        raise unsupported("--config")
     if scenario is not None:
         raise unsupported("--scenario")
     if model is not None:
@@ -83,12 +81,19 @@ def run(
 
     try:
         bundle_path = run_bundle(
-            turns=turns,
-            mode=mode,
             root=runs_dir_from_option(runs_dir),
             run_id=run_id,
-            run_seed=seed,
-            epochs=epochs,
+            config_path=config,
+            **(
+                {}
+                if config is not None
+                else {
+                    "turns": turns,
+                    "mode": mode,
+                    "run_seed": seed,
+                    "epochs": epochs,
+                }
+            ),
         )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
