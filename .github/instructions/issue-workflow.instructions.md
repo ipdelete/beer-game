@@ -35,7 +35,11 @@ priority; do not create or maintain a separate local backlog queue.
    - `uv run pytest -q`;
    - formatter checks on touched Python files;
    - the real command path or artifact inspection relevant to the issue.
-8. Commit, push, create a PR, squash-merge, delete the issue branch, and pull
+8. After validation, run a tiny end-to-end smoke that exercises the new work and
+   confirms existing behavior still looks sane. Prefer temporary artifacts under
+   `/tmp`, for example a short `bench.run` followed by `bench.report` and a
+   focused artifact query for benchmark changes.
+9. Commit, push, create a PR, squash-merge, delete the issue branch, and pull
    latest `master`.
 
 ## PR conventions
