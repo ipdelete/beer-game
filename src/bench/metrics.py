@@ -15,6 +15,8 @@ ReducerFn = Callable[[list[float]], float]
 
 _METRIC_REGISTRY: dict[str, MetricFn] = {}
 DEFAULT_REDUCER_SEED = 0
+LOWER_IS_BETTER = "lower_is_better"
+HIGHER_IS_BETTER = "higher_is_better"
 
 
 @dataclass(frozen=True)
@@ -27,13 +29,19 @@ class ReducedMetric:
     values: list[float]
 
 
-def metric(name: str | None = None) -> Callable[[MetricFn], MetricFn]:
+def metric(
+    name: str | None = None, *, direction: str = LOWER_IS_BETTER
+) -> Callable[[MetricFn], MetricFn]:
     """Register a metric function by name."""
+
+    if direction not in {LOWER_IS_BETTER, HIGHER_IS_BETTER}:
+        raise ValueError(f"Unknown metric direction: {direction}")
 
     def decorator(fn: MetricFn) -> MetricFn:
         metric_name = name or fn.__name__
         _METRIC_REGISTRY[metric_name] = fn
         setattr(fn, "metric_name", metric_name)
+        setattr(fn, "metric_direction", direction)
         return fn
 
     return decorator
@@ -43,6 +51,14 @@ def list_metrics() -> list[str]:
     """Return registered metric names in sorted order."""
 
     return sorted(_METRIC_REGISTRY)
+
+
+def metric_direction(name: str) -> str:
+    """Return whether lower or higher values are better for a metric."""
+
+    if name not in _METRIC_REGISTRY:
+        raise KeyError(f"Unknown metric: {name}")
+    return getattr(_METRIC_REGISTRY[name], "metric_direction", LOWER_IS_BETTER)
 
 
 def run_metrics(
@@ -145,7 +161,7 @@ def bullwhip_ratio(con: duckdb.DuckDBPyConnection) -> float | None:
     return float(sum(ratios) / len(ratios))
 
 
-@metric()
+@metric(direction=HIGHER_IS_BETTER)
 def parse_success_rate(con: duckdb.DuckDBPyConnection) -> float | None:
     """Fraction of decision rows with `parse_ok = true`.
 
