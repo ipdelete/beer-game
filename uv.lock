@@ -689,9 +689,10 @@ wheels = [
 [[package]]
 name = "beer-game"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "agent-framework" },
+    { name = "click" },
     { name = "duckdb" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -720,6 +721,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "agent-framework", specifier = ">=1.1.0" },
+    { name = "click", specifier = ">=8.3.1" },
     { name = "duckdb", specifier = ">=1.5.3" },
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "numpy", specifier = ">=2.4.4" },

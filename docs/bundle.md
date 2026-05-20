@@ -44,6 +44,20 @@ uv run python -m bench.report runs/<run_id>.eval
 The report intentionally uses plain ASCII tables so it works in terminals,
 logs, and CI without extra rendering support.
 
+The top-level benchmark CLI wraps the same bundle commands:
+
+```bash
+uv run bench run --mode mechanistic --turns 6 --epochs 2 --runs-dir /tmp/beer-game-check
+uv run bench list --runs-dir /tmp/beer-game-check
+uv run bench report latest --runs-dir /tmp/beer-game-check --format json
+uv run bench show latest --runs-dir /tmp/beer-game-check
+```
+
+Bundle arguments can be full `.eval` paths, `latest`, or a unique short prefix
+inside `runs/` or `BEERGAME_RUNS_DIR`. The `compare` command is present as the
+future issue #15 contract and exits non-zero until paired bootstrap significance
+lands.
+
 Metric functions live in `src.bench.metrics` and register themselves with the
 `@metric()` decorator. Registered metrics accept a DuckDB connection from
 `open_bundle()` or `open_bundles()` and return scalar values for reports and
