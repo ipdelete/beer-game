@@ -11,6 +11,7 @@ from typing import Any
 import duckdb
 
 from src.bench.bundle import ROLE_NAMES
+from src.bench.metrics import run_metrics
 from src.bench.query import open_bundle
 
 
@@ -31,6 +32,8 @@ def print_report(con: duckdb.DuckDBPyConnection, bundle_path: str | Path) -> Non
     print_tokens(con)
     print()
     print_latency(con)
+    print()
+    print_metrics(con)
 
 
 def print_summary(con: duckdb.DuckDBPyConnection, bundle_path: str | Path) -> None:
@@ -107,6 +110,15 @@ def print_latency(con: duckdb.DuckDBPyConnection) -> None:
             print()
         print(f"Latency by role (model: {model}, mean / p95 in ms)")
         print(_format_table(["role", "mean", "p95"], _latency_rows(model_rows)))
+
+
+def print_metrics(con: duckdb.DuckDBPyConnection) -> None:
+    metrics = run_metrics(con)
+    rows = [
+        [name, _format_metric_value(name, value)] for name, value in metrics.items()
+    ]
+    print("Metrics")
+    print(_format_table(["metric", "value"], rows))
 
 
 def _group_rows(rows: list[tuple[Any, ...]]) -> dict[str, list[tuple[Any, ...]]]:
@@ -230,6 +242,18 @@ def _format_total(input_tokens: int | None, output_tokens: int | None) -> str:
     if input_tokens is None or output_tokens is None:
         return "n/a"
     return _format_number(input_tokens + output_tokens)
+
+
+def _format_metric_value(name: str, value: Any) -> str:
+    if value is None:
+        return "n/a"
+    if name == "recovery_time":
+        return f"{value:g} weeks"
+    if isinstance(value, float):
+        return f"{value:,.2f}"
+    if isinstance(value, int):
+        return f"{value:,}"
+    return str(value)
 
 
 if __name__ == "__main__":

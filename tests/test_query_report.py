@@ -59,6 +59,8 @@ def test_report_prints_summary_tokens_and_latency(capsys, tmp_path):
     assert "10" in output
     assert "Latency by role (model: test-model, mean / p95 in ms)" in output
     assert "102" in output
+    assert "Metrics" in output
+    assert "total_cost" in output
 
 
 def test_report_handles_null_token_and_latency_columns(capsys):
@@ -81,6 +83,7 @@ def test_module_entrypoint_runs_report():
     assert "Bundle:" in result.stdout
     assert "Tokens by role" in result.stdout
     assert "Latency by role" in result.stdout
+    assert "Metrics" in result.stdout
 
 
 def _write_bundle(
