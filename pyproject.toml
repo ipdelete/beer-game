@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "agent-framework>=1.1.0",
+    "click>=8.3.1",
     "duckdb>=1.5.3",
     "matplotlib>=3.10.8",
     "numpy>=2.4.4",
@@ -15,6 +16,9 @@ dependencies = [
     "pandas>=3.0.2",
     "pyarrow>=24.0.0",
 ]
+
+[project.scripts]
+bench = "bench.cli.main:bench"
 
 [project.optional-dependencies]
 test = ["pytest>=8.0.0"]
@@ -26,3 +30,11 @@ dev = [
     "opentelemetry-exporter-otlp-proto-http>=1.41.0",
     "pytest>=8.4.0",
 ]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bench*", "src*"]
