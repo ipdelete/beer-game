@@ -193,7 +193,7 @@
     </header>
 
     <div class="hero-row">
-      <span class="badge status">Pre-flight · awaiting kickoff</span>
+      <span class="badge status">Run 2 · prompt-v2 full rerun planned</span>
       <span class="badge">Scenario: step_4_8_36w</span>
       <span class="badge">Mode: GABM × 3 + mechanistic</span>
     </div>
@@ -201,9 +201,11 @@
     <h1>Run Preview · Bench Pass 001</h1>
     <p class="lede">
       Four contenders, one scenario, single-tenant serial execution on Apple Silicon.
-      This page is the pre-flight: what runs, on what hardware, with what knobs, and
-      how long it should take. Result bundles will land as <code>.eval</code> files
-      and be reported alongside the mechanistic baseline.
+      Run 1 produced valid mechanistic, gemma4, and gpt-oss bundles, then exposed a
+      ds4 configuration mistake: ds4 treats <code>reasoning_effort: medium</code> as
+      normal high-thinking. The follow-up DoE showed the bigger prompt lesson:
+      every GABM contender should receive the same explicit Beer Game state
+      semantics. Run 2 is therefore a full prompt-v2 rerun, not a ds4-only patch.
     </p>
 
     <div class="hero">
@@ -235,15 +237,15 @@
       <div class="card">
         <h3>Estimated wall-clock</h3>
         <div class="metric">
-          <div class="label">End-to-end</div>
-          <div class="value">~5.4h</div>
-          <div class="sub">Serial, one model server at a time</div>
+          <div class="label">Run 1 completed before stop</div>
+          <div class="value">3/4</div>
+          <div class="sub">mech + gemma4 + gpt-oss bundles are valid</div>
         </div>
         <div style="height:12px"></div>
         <div class="metric">
-          <div class="label">Bottleneck</div>
-          <div class="value">ds4</div>
-          <div class="sub">~4.0h of the budget</div>
+          <div class="label">Run 2 scope</div>
+          <div class="value">4/4</div>
+          <div class="sub">rerun all contenders under <code>gabm-v2</code></div>
         </div>
       </div>
     </div>
@@ -290,8 +292,8 @@
           <td>ds4-server (Metal)</td>
           <td>DeepSeek-V4-Flash</td>
           <td><span class="pill">medium</span></td>
-          <td class="num">16,384</td>
-          <td class="num">~4.0h</td>
+          <td class="num">2,048</td>
+          <td class="num">Run 2</td>
         </tr>
       </tbody>
     </table>
@@ -307,12 +309,12 @@
       <div class="seg mech" title="mechanistic — ~5s">·</div>
       <div class="seg gpt-oss" title="gpt-oss-20b — ~29m">29m</div>
       <div class="seg gemma4" title="gemma4-e4b — ~36m">36m</div>
-      <div class="seg ds4" title="ds4 — ~4.0h">4h</div>
+      <div class="seg ds4" title="ds4 — prompt-v2 bounded medium">v2</div>
     </div>
     <p class="lede" style="font-size:13px; margin-top:6px;">
-      Bars are proportional to estimated wall-clock. Runs execute serially so that one
-      inference server owns the GPU at a time — keeps per-token latency comparable across
-      contenders on the same machine.
+      Run 1 estimates were wrong for ds4 because <code>medium</code> reasoning was not
+      actually medium in ds4. The proportional bar is retained as original pre-flight
+      context; Run 2 will produce a fresh prompt-v2 bundle set for every contender.
     </p>
 
     <div class="hero">
@@ -360,9 +362,11 @@
     </p>
     <div class="card" style="padding:8px 22px">
       <ul class="pin-list">
-        <li><code>max_tokens = 16384</code><span class="desc">Across all three LLMs — same headroom for reasoning + JSON output</span></li>
-        <li><code>reasoning_effort = medium</code><span class="desc">For models that expose it (gpt-oss, ds4, gemma4 via extra_body)</span></li>
-        <li><code>temperature = 0</code><span class="desc">Greedy decoding for reproducibility</span></li>
+        <li><code>prompt_version = gabm-v2</code><span class="desc">Shared state semantics plus demand-anchored inventory-position heuristic for all GABM contenders</span></li>
+        <li><code>max_tokens = 16384</code><span class="desc">Run 2 Ollama contenders: gemma4 and gpt-oss</span></li>
+        <li><code>ds4 max_tokens = 2048</code><span class="desc">Run 2 bounded medium-thinking after the prompt DoE</span></li>
+        <li><code>reasoning_effort = medium</code><span class="desc">Pinned for gpt-oss and ds4; ds4 remains bounded by prompt v2 and max tokens</span></li>
+        <li><code>temperature = 0.4</code><span class="desc">Pinned across local model configs</span></li>
         <li><code>FLASH_ATTENTION=1</code><span class="desc">Ollama flash-attention enabled</span></li>
         <li><code>KV_CACHE_TYPE=q8_0</code><span class="desc">Ollama 8-bit KV cache</span></li>
         <li><code>NUM_PARALLEL=1</code><span class="desc">Single in-flight request per model — no batching contention</span></li>
@@ -372,9 +376,13 @@
     </div>
 
     <div class="note">
-      <strong>Known asymmetries.</strong> "medium" reasoning is not vendor-calibrated;
-      KV cache strategies differ between Ollama and ds4-server; the inference engines
-      themselves are different. We publish the full config rather than claim parity.
+      <strong>Run 1 lesson.</strong> ds4 <code>medium</code> was not vendor-calibrated:
+      source inspection showed <code>medium</code>, <code>low</code>, and
+      <code>minimal</code> all collapse to normal high-thinking. The stopped run is
+      recorded in <a href="bench-pass-001.json"><code>docs/bench-pass-001.json</code></a>
+      so the published result can explain why Run 2 exists. The prompt DoE also
+      showed that clarifying <code>on_order</code> semantics and preserving the demand
+      anchor cut ds4's single-decision latency enough to justify a fair full rerun.
     </div>
 
     <h2>How to reproduce</h2>
@@ -383,8 +391,11 @@
 scripts/start-ollama.sh
 scripts/start-ds4.sh
 
-<span class="c"># 2. Run the full bench pass — mechanistic + 3 LLMs, serial</span>
+<span class="c"># 2. Run 1: full bench pass — mechanistic + 3 LLMs, serial</span>
 scripts/single-tenant-bench.sh
+
+<span class="c"># Run 2: full prompt-v2 rerun for fairness</span>
+TAG=v2 scripts/single-tenant-bench.sh
 
 <span class="c"># 3. Stop the servers</span>
 scripts/stop-ds4.sh

@@ -22,7 +22,7 @@ from ..engine.state import PlayerRecord, PlayerView
 
 DEFAULT_ENDPOINT = "http://localhost:11434/v1"
 DEFAULT_MODEL = "mistral:latest"
-PROMPT_VERSION = "gabm-v1"
+PROMPT_VERSION = "gabm-v2"
 _MODEL_CONFIG: dict | None = None
 _CACHE: ResponseCache | None = None
 
@@ -41,9 +41,14 @@ _UPSTREAM = {
 }
 
 
+def _lead_time_hint(role: str) -> int:
+    return 2 if role == "Factory" else 4
+
+
 def _system_prompt(role: str) -> str:
     upstream = _UPSTREAM[role]
     downstream = _DOWNSTREAM[role]
+    lead_time = _lead_time_hint(role)
     target_text = (
         f"place an order to the {upstream}" if upstream else "set a production quantity"
     )
@@ -56,9 +61,15 @@ def _system_prompt(role: str) -> str:
         "IMPORTANT — avoid double-ordering: remember the orders you have already placed are "
         "still in the pipeline (see 'on_order'). Ordering to cover your entire backlog every "
         "week when earlier orders are still en route is the classic bullwhip mistake. "
-        "Anchor your order on recent incoming demand and adjust gently for the gap between "
-        "desired inventory position (≈ 12 + L × demand) and actual position "
-        "(inventory − backlog + on_order)."
+        "Use the simulator state as current truth: current inventory, current backlog, "
+        "and on_order are already the values to use for this decision. Do not reconstruct "
+        "earlier pipeline quantities or add/subtract shipment_received again when using "
+        "on_order. Compute inventory_position = inventory - backlog + on_order. "
+        f"Use this concise default heuristic: recent_demand is the incoming order adjusted "
+        f"only gently by history; target_position = 12 + {lead_time} * recent_demand; "
+        "gap = target_position - inventory_position; order = max(0, round(recent_demand + "
+        "0.25 * gap)). Adjust only for clear backlog or trend evidence. Do not write your "
+        "reasoning in the final answer; final answer must be exactly one non-negative integer."
     )
 
 
@@ -85,7 +96,10 @@ def _user_prompt(view: PlayerView) -> str:
         f"Incoming order this week (from {_DOWNSTREAM[view.role]}): {view.incoming_order}\n"
         f"Shipment received this week: {view.shipment_received}\n"
         f"Last order you placed: {view.last_order_placed}\n"
-        f"Orders still in pipeline (on_order): {view.on_order}\n\n"
+        f"Orders still in pipeline (on_order): {view.on_order}\n"
+        "State timing note: inventory, backlog, and on_order are current simulator "
+        "values for this decision. Use on_order directly in inventory_position; do "
+        "not compensate again for shipment_received.\n\n"
         f"History:\n{_history_table(view.history)}\n\n"
         "How many cases should you order this week?\n"
         "Respond with ONLY a single non-negative integer."

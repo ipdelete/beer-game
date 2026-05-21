@@ -81,10 +81,16 @@ prompt version, sampling params, git SHA in the manifest).
 
 **What the driver pins for fairness**:
 
-- All three models share `temperature 0.4`, `top_p 0.95`,
-  `max_tokens 16384`, and the same prompts, scenarios, and seed.
-- gpt-oss and ds4 run with `reasoning_effort: "medium"` (gemma4 has no
-  native reasoning mode).
+- All three GABM models share `temperature 0.4`, `top_p 0.95`, prompt version
+  `gabm-v2`, scenarios, and seed. Prompt v2 makes Beer Game state semantics
+  explicit: `on_order` is used directly in inventory position and models should
+  anchor orders on recent demand plus a gentle 0.25 adjustment toward target.
+- gemma4 and gpt-oss use `max_tokens 16384`; gpt-oss runs with
+  `reasoning_effort: "medium"`.
+- ds4 uses `deepseek-v4-flash`, `reasoning_effort: "medium"`, and
+  `max_tokens 2048`. Bench Pass 001 Run 1 showed that ds4 maps medium to
+  normal high-thinking; prompt-v2 tuning bounds the response enough to test it
+  fairly instead of switching to the no-thinking `deepseek-chat` alias.
 - Ollama runs with `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`,
   `OLLAMA_KEEP_ALIVE=15m`, `OLLAMA_NUM_PARALLEL=1` — set by
   `scripts/start-ollama.sh`.

@@ -369,17 +369,54 @@ def _decision_fn(
     agents: dict[str, GABMAgent] = {}
 
     def decide(view: PlayerView) -> int:
+        role_name = _role_name(view.role)
+        started = time.monotonic()
+        _log_progress_event(
+            "llm_request_start "
+            f"run={telemetry_fields.get('run_id')} "
+            f"game={telemetry_fields.get('game_id')} "
+            f"model={model['id']} "
+            f"scenario={telemetry_fields.get('scenario_id')} "
+            f"epoch={telemetry_fields.get('epoch')} "
+            f"week={view.week} role={role_name}"
+        )
         with decision_context(
             **telemetry_fields,
             week=view.week,
-            role=_role_name(view.role),
+            role=role_name,
             cache_hit=False,
             context_used=None,
             context_window=None,
         ):
-            if view.role not in agents:
-                agents[view.role] = GABMAgent(view.role, config=model, cache=cache)
-            return max(0, int(agents[view.role].decide(view)))
+            try:
+                if view.role not in agents:
+                    agents[view.role] = GABMAgent(view.role, config=model, cache=cache)
+                decision = max(0, int(agents[view.role].decide(view)))
+            except Exception as exc:
+                elapsed_ms = int((time.monotonic() - started) * 1000)
+                _log_progress_event(
+                    "llm_request_error "
+                    f"run={telemetry_fields.get('run_id')} "
+                    f"game={telemetry_fields.get('game_id')} "
+                    f"model={model['id']} "
+                    f"scenario={telemetry_fields.get('scenario_id')} "
+                    f"epoch={telemetry_fields.get('epoch')} "
+                    f"week={view.week} role={role_name} "
+                    f"latency_ms={elapsed_ms} error={type(exc).__name__}"
+                )
+                raise
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        _log_progress_event(
+            "llm_request_done "
+            f"run={telemetry_fields.get('run_id')} "
+            f"game={telemetry_fields.get('game_id')} "
+            f"model={model['id']} "
+            f"scenario={telemetry_fields.get('scenario_id')} "
+            f"epoch={telemetry_fields.get('epoch')} "
+            f"week={view.week} role={role_name} "
+            f"decision={decision} latency_ms={elapsed_ms}"
+        )
+        return decision
 
     return decide
 
@@ -484,3 +521,7 @@ def _print_progress(done: int, total: int) -> None:
     bar = "#" * filled + "-" * (width - filled)
     end = "\n" if done == total else "\r"
     print(f"[{bar}] {done}/{total}", end=end, file=sys.stderr, flush=True)
+
+
+def _log_progress_event(message: str) -> None:
+    print(f"[bench] {utc_now()} {message}", file=sys.stderr, flush=True)
