@@ -38,6 +38,74 @@ To compare the rule-based (mechanistic) approach with the Generative Agent-Based
    ```
    This will generate a comparison plot under `/tmp/beer-game-comparison/`.
 
+## Reproducing the benchmark bundles
+
+The Beer Game Benchmark runs the classic Sterman `step_4_8_36w` scenario
+across a mechanistic baseline plus three local model contenders, producing
+one `.eval` bundle per contender that feeds the dashboard.
+
+**Hardware target**: Apple Silicon with Metal (developed on M3 Ultra,
+512 GB unified memory). For Linux+CUDA, the ds4 build path is different;
+see [antirez/ds4](https://github.com/antirez/ds4).
+
+**Prerequisites**:
+
+1. [Ollama.app](https://ollama.com) installed, plus model pulls:
+   ```bash
+   ollama pull gemma4:e4b-it-q4_K_M
+   ollama pull gpt-oss:20b
+   ```
+
+2. [antirez/ds4](https://github.com/antirez/ds4) cloned to `~/src/ds4`
+   (override with `DS4_DIR=...`), built from **current source** with the
+   model file present as `ds4flash.gguf`:
+   ```bash
+   git clone https://github.com/antirez/ds4.git ~/src/ds4
+   cd ~/src/ds4
+   ./download_model.sh q2-imatrix   # 96/128 GB Macs
+   make clean && make -j8           # do NOT use stale binaries
+   ```
+   Older ds4 binaries (pre-May-20 2026) have a chat-rendering bug that
+   produces nonsense output. Always rebuild from a fresh `git pull` before
+   benchmarking.
+
+**One-shot run** (mechanistic → gemma4 → gpt-oss → ds4, single-tenant):
+
+```bash
+./scripts/single-tenant-bench.sh
+```
+
+Output bundles land in `/tmp/beer-game-runs/*.eval` (override with
+`RUNS_DIR=...`). Each bundle is self-describing (config hash, scenario,
+prompt version, sampling params, git SHA in the manifest).
+
+**What the driver pins for fairness**:
+
+- All three GABM models share `temperature 0.4`, `top_p 0.95`, prompt version
+  `gabm-v2`, scenarios, and seed. Prompt v2 makes Beer Game state semantics
+  explicit: `on_order` is used directly in inventory position and models should
+  anchor orders on recent demand plus a gentle 0.25 adjustment toward target.
+- gemma4 and gpt-oss use `max_tokens 16384`; gpt-oss runs with
+  `reasoning_effort: "medium"`.
+- ds4 uses `deepseek-v4-flash`, `reasoning_effort: "medium"`, and
+  `max_tokens 2048`. Bench Pass 001 Run 1 showed that ds4 maps medium to
+  normal high-thinking; prompt-v2 tuning bounds the response enough to test it
+  fairly instead of switching to the no-thinking `deepseek-chat` alias.
+- Ollama runs with `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`,
+  `OLLAMA_KEEP_ALIVE=15m`, `OLLAMA_NUM_PARALLEL=1` — set by
+  `scripts/start-ollama.sh`.
+- ds4 runs with `--ctx 32768 --metal --kv-disk-dir /tmp/beer-game-ds4-kv` —
+  set by `scripts/start-ds4.sh`.
+- Single-tenant: only one model server holds GPU at a time. Ollama is
+  stopped before ds4 starts.
+- The driver leaves any pre-existing server it didn't start untouched.
+
+All configurations live under `configs/models/*.yaml` and
+`configs/runs/*.yaml` — those files are the source of truth, and the
+driver passes them via `bench run --config`. To change a knob, edit the
+YAML and re-run; the response cache invalidates on any config change that
+affects model output.
+
 ## Adding ds4 (DeepSeek V4 Flash) as a Target
 
 [antirez/ds4](https://github.com/antirez/ds4) is a native inference engine for

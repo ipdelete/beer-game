@@ -1,0 +1,266 @@
+{
+  "bench_pass": "001",
+  "scenario": "step_4_8_36w",
+  "weeks": 36,
+  "epochs": 1,
+  "hardware": {
+    "machine": "Mac Studio",
+    "soc": "Apple M3 Ultra",
+    "gpu_cores": 80,
+    "unified_memory_gb": 512
+  },
+  "attempts": [
+    {
+      "id": "run-1",
+      "started_at_utc": "2026-05-20T21:54:35Z",
+      "stopped_at_utc": "2026-05-21T13:05:25Z",
+      "status": "stopped",
+      "reason": "ds4 high-thinking run exceeded practical runtime; stopped by operator after ds4 produced long THINKING responses.",
+      "bundles": [
+        {
+          "run_id": "mechanistic-v1",
+          "bundle": "/tmp/beer-game-runs/mechanistic-v1.eval",
+          "status": "ok",
+          "wall_time": "0s",
+          "total_cost": 2891.5,
+          "bullwhip_ratio": 104.22,
+          "recovery_time": "24 weeks",
+          "parse_success_rate": 1.0
+        },
+        {
+          "run_id": "gemma4-e4b-v1",
+          "bundle": "/tmp/beer-game-runs/gemma4-e4b-v1.eval",
+          "status": "ok",
+          "wall_time": "40m 57s",
+          "total_cost": 9660.0,
+          "bullwhip_ratio": 1501.09,
+          "recovery_time": null,
+          "parse_success_rate": 1.0,
+          "tokens": {
+            "input": 121936,
+            "output": 166821,
+            "total": 288757
+          }
+        },
+        {
+          "run_id": "gpt-oss-20b-v1",
+          "bundle": "/tmp/beer-game-runs/gpt-oss-20b-v1.eval",
+          "status": "ok",
+          "wall_time": "1h 30m 0s",
+          "total_cost": 2288.5,
+          "bullwhip_ratio": 487.11,
+          "recovery_time": "8 weeks",
+          "parse_success_rate": 1.0,
+          "tokens": {
+            "input": 135055,
+            "output": 502929,
+            "total": 637984
+          }
+        },
+        {
+          "run_id": "ds4-v1",
+          "bundle": "/tmp/beer-game-runs/ds4-v1.eval",
+          "status": "stopped",
+          "wall_time_before_stop": "12h 58m",
+          "completed_chat_responses_observed": 47,
+          "completed_games": 0,
+          "config": {
+            "model": "deepseek-v4-flash",
+            "max_tokens": 16384,
+            "extra_body": {
+              "reasoning_effort": "medium"
+            }
+          },
+          "lesson": "ds4 maps medium/low/minimal/high reasoning_effort to normal HIGH thinking; with 16k max_tokens, individual Beer Game decisions can spend thousands of hidden reasoning tokens and run for tens of minutes to hours."
+        }
+      ],
+      "lessons": [
+        "Bench runner progress logging is required for long GABM runs; without per-week/per-role logs, an active model call looks stuck.",
+        "ds4 reasoning_effort values are not calibrated like gpt-oss; medium is high-thinking in ds4.",
+        "A ds4-only correction would not be fair after prompt tuning; Run 2 should rerun every contender under the same prompt version."
+      ],
+      "ds4_prompt_tuning": [
+        {
+          "id": "doe-1",
+          "description": "Screened medium-thinking ds4 across max_tokens, thinking-budget instruction, and output strictness on the week-1 retailer case.",
+          "held_constant": {
+            "model": "deepseek-v4-flash",
+            "reasoning_effort": "medium",
+            "temperature": 0.4,
+            "top_p": 0.95,
+            "timeout_seconds": 120
+          },
+          "factors": {
+            "max_tokens": [
+              1024,
+              2048,
+              4096
+            ],
+            "budget_instruction": [
+              "none",
+              100,
+              400
+            ],
+            "strictness": [
+              "strict",
+              "checklist"
+            ]
+          },
+          "result": {
+            "rows": 18,
+            "max_tokens_1024_successes": "0/6",
+            "max_tokens_2048_successes": "1/6",
+            "max_tokens_4096_successes": "6/6",
+            "best_2048_condition": "A2048_B100_Cchecklist",
+            "best_2048_wall_seconds": 41.44,
+            "lesson": "A 100-token budget instruction helped, but most 2048-token variants still spilled reasoning into final content and hit the cap."
+          }
+        },
+        {
+          "id": "doe-2",
+          "description": "Held max_tokens=2048, reasoning_effort=medium, and budget_instruction=100 while sweeping system prompt contract and user prompt shape.",
+          "result": {
+            "rows": 9,
+            "successes": "4/9",
+            "best_condition": "Sthree_step_budget_Ubaseline",
+            "best_wall_seconds": 40.77,
+            "best_completion_tokens": 1336,
+            "lesson": "The system prompt mattered more than stricter user output formatting; front-loaded output contracts often increased visible reasoning."
+          }
+        },
+        {
+          "id": "direct-policy-shortcut",
+          "description": "One direct ds4 call added explicit inventory-position semantics and a cautious policy shortcut.",
+          "baseline_winner_call": {
+            "wall_seconds": 58.804,
+            "completion_tokens": 1888,
+            "reasoning_chars": 8090,
+            "content": "0"
+          },
+          "policy_shortcut_call": {
+            "wall_seconds": 22.801,
+            "completion_tokens": 705,
+            "reasoning_chars": 2744,
+            "content": "0",
+            "parseable_int": true
+          },
+          "lesson": "The major token sink was ambiguity around on_order and shipment timing. Prompt v2 should clarify state semantics for every GABM model, while preserving the demand anchor rather than teaching a blanket zero-order rule."
+        },
+        {
+          "id": "prompt-v2-formula-smoke",
+          "description": "Real bench smoke after tightening prompt v2 to a shared demand-anchored heuristic: order = max(0, round(recent_demand + 0.25 * (target_position - inventory_position))).",
+          "config": {
+            "model": "deepseek-v4-flash",
+            "reasoning_effort": "medium",
+            "max_tokens": 2048,
+            "prompt_version": "gabm-v2"
+          },
+          "result": {
+            "bundle": "/tmp/beer-game-check/ds4-prompt-v2-formula-smoke.eval",
+            "wall_time": "37s",
+            "parse_success_rate": 1.0,
+            "strict_int_parse_rate": 1.0,
+            "output_tokens": 1053,
+            "total_tokens": 2674,
+            "role_latencies_ms": {
+              "retailer": 9499,
+              "wholesaler": 7113,
+              "distributor": 6379,
+              "factory": 13873
+            }
+          },
+          "lesson": "The final prompt-v2 formula preserved the demand anchor, avoided a blanket zero-order rule, and made ds4 medium-thinking smoke-testable with strict integer outputs."
+        }
+      ]
+    },
+    {
+      "id": "run-2",
+      "status": "completed",
+      "planned_command": "TAG=v2 RUNS_DIR=/tmp/beer-game-runs scripts/single-tenant-bench.sh",
+      "scope": "Full rerun of mechanistic, gemma4, gpt-oss, and ds4 so every GABM contender is evaluated under prompt_version gabm-v2.",
+      "prompt_version": "gabm-v2",
+      "prompt_change": "Shared Beer Game state semantics: use on_order directly in inventory_position, do not reconstruct pipeline or compensate again for shipment_received, anchor orders on recent demand plus a cautious 0.25 adjustment toward target, and return exactly one non-negative integer.",
+      "planned_ds4_config": {
+        "model": "deepseek-v4-flash",
+        "max_tokens": 2048,
+        "extra_body": {
+          "reasoning_effort": "medium"
+        }
+      },
+      "started_at_utc": "2026-05-21T16:08:33Z",
+      "ended_at_utc": "2026-05-21T18:32:45Z",
+      "result": "All four prompt-v2 bundles completed and passed postcheck.",
+      "bundles": [
+        {
+          "run_id": "mechanistic-v2",
+          "bundle": "/tmp/beer-game-runs/mechanistic-v2.eval",
+          "status": "ok",
+          "wall_time": "0s",
+          "total_cost": 2891.5,
+          "bullwhip_ratio": 104.22,
+          "recovery_time": "24 weeks",
+          "parse_success_rate": 1.0
+        },
+        {
+          "run_id": "gemma4-e4b-v2",
+          "bundle": "/tmp/beer-game-runs/gemma4-e4b-v2.eval",
+          "status": "ok",
+          "wall_time": "27m 55s",
+          "total_cost": 2262.5,
+          "bullwhip_ratio": 147.12,
+          "recovery_time": null,
+          "parse_success_rate": 1.0,
+          "tokens": {
+            "input": 143192,
+            "output": 111356,
+            "total": 254548
+          }
+        },
+        {
+          "run_id": "gpt-oss-20b-v2",
+          "bundle": "/tmp/beer-game-runs/gpt-oss-20b-v2.eval",
+          "status": "ok",
+          "wall_time": "28m 5s",
+          "total_cost": 1618.0,
+          "bullwhip_ratio": 87.98,
+          "recovery_time": null,
+          "parse_success_rate": 1.0,
+          "tokens": {
+            "input": 155905,
+            "output": 154727,
+            "total": 310632
+          }
+        },
+        {
+          "run_id": "ds4-v2",
+          "bundle": "/tmp/beer-game-runs/ds4-v2.eval",
+          "status": "ok",
+          "wall_time": "1h 27m 57s",
+          "total_cost": 6402.0,
+          "bullwhip_ratio": 1328.26,
+          "recovery_time": null,
+          "parse_success_rate": 1.0,
+          "tokens": {
+            "input": 127096,
+            "output": 153459,
+            "total": 280555
+          },
+          "parse_strategies": {
+            "strict_int": {
+              "calls": 100,
+              "pct": 69.4
+            },
+            "last_line_int": {
+              "calls": 35,
+              "pct": 24.3
+            },
+            "first_int_anywhere": {
+              "calls": 9,
+              "pct": 6.2
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

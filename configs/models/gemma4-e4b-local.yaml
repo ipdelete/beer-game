@@ -1,0 +1,12 @@
+id: gemma4-e4b-local
+provider: openai-compatible
+base_url: "http://localhost:11434/v1"
+model: "gemma4:e4b-it-q4_K_M"
+temperature: 0.4
+top_p: 0.95
+context_window: 16384
+max_tokens: 16384
+extra_body:
+  options:
+    num_ctx: 16384
+    num_predict: 16384

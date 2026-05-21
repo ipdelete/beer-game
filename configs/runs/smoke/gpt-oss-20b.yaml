@@ -1,0 +1,14 @@
+import: "../gpt-oss-20b.yaml"
+
+weeks: 1
+epochs: 1
+
+_list_policy:
+  scenarios: replace
+  models: replace
+
+scenarios:
+  - import: "../../scenarios/step_4_8_smoke.yaml"
+
+models:
+  - import: "../../models/gpt-oss-20b-local.yaml"

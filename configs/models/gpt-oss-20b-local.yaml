@@ -1,0 +1,13 @@
+id: gpt-oss-20b-local
+provider: openai-compatible
+base_url: "http://localhost:11434/v1"
+model: "gpt-oss:20b"
+temperature: 0.4
+top_p: 0.95
+context_window: 16384
+max_tokens: 16384
+extra_body:
+  reasoning_effort: "medium"
+  options:
+    num_ctx: 16384
+    num_predict: 16384

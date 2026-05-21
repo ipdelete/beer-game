@@ -14,8 +14,9 @@ Before substantial repo work:
 
 1. Read `SOUL.md`.
 2. Read `README.md`.
-3. Run `git ls-files`.
-4. If asked whether this bootstrap happened, answer plainly and specifically.
+3. Read `.github/invariants.md` and respect every invariant listed there.
+4. Run `git ls-files`.
+5. If asked whether this bootstrap happened, answer plainly and specifically.
 
 ## Role
 
