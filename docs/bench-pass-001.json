@@ -91,9 +91,20 @@
             "timeout_seconds": 120
           },
           "factors": {
-            "max_tokens": [1024, 2048, 4096],
-            "budget_instruction": ["none", 100, 400],
-            "strictness": ["strict", "checklist"]
+            "max_tokens": [
+              1024,
+              2048,
+              4096
+            ],
+            "budget_instruction": [
+              "none",
+              100,
+              400
+            ],
+            "strictness": [
+              "strict",
+              "checklist"
+            ]
           },
           "result": {
             "rows": 18,
@@ -164,7 +175,7 @@
     },
     {
       "id": "run-2",
-      "status": "planned",
+      "status": "completed",
       "planned_command": "TAG=v2 RUNS_DIR=/tmp/beer-game-runs scripts/single-tenant-bench.sh",
       "scope": "Full rerun of mechanistic, gemma4, gpt-oss, and ds4 so every GABM contender is evaluated under prompt_version gabm-v2.",
       "prompt_version": "gabm-v2",
@@ -175,7 +186,81 @@
         "extra_body": {
           "reasoning_effort": "medium"
         }
-      }
+      },
+      "started_at_utc": "2026-05-21T16:08:33Z",
+      "ended_at_utc": "2026-05-21T18:32:45Z",
+      "result": "All four prompt-v2 bundles completed and passed postcheck.",
+      "bundles": [
+        {
+          "run_id": "mechanistic-v2",
+          "bundle": "/tmp/beer-game-runs/mechanistic-v2.eval",
+          "status": "ok",
+          "wall_time": "0s",
+          "total_cost": 2891.5,
+          "bullwhip_ratio": 104.22,
+          "recovery_time": "24 weeks",
+          "parse_success_rate": 1.0
+        },
+        {
+          "run_id": "gemma4-e4b-v2",
+          "bundle": "/tmp/beer-game-runs/gemma4-e4b-v2.eval",
+          "status": "ok",
+          "wall_time": "27m 55s",
+          "total_cost": 2262.5,
+          "bullwhip_ratio": 147.12,
+          "recovery_time": null,
+          "parse_success_rate": 1.0,
+          "tokens": {
+            "input": 143192,
+            "output": 111356,
+            "total": 254548
+          }
+        },
+        {
+          "run_id": "gpt-oss-20b-v2",
+          "bundle": "/tmp/beer-game-runs/gpt-oss-20b-v2.eval",
+          "status": "ok",
+          "wall_time": "28m 5s",
+          "total_cost": 1618.0,
+          "bullwhip_ratio": 87.98,
+          "recovery_time": null,
+          "parse_success_rate": 1.0,
+          "tokens": {
+            "input": 155905,
+            "output": 154727,
+            "total": 310632
+          }
+        },
+        {
+          "run_id": "ds4-v2",
+          "bundle": "/tmp/beer-game-runs/ds4-v2.eval",
+          "status": "ok",
+          "wall_time": "1h 27m 57s",
+          "total_cost": 6402.0,
+          "bullwhip_ratio": 1328.26,
+          "recovery_time": null,
+          "parse_success_rate": 1.0,
+          "tokens": {
+            "input": 127096,
+            "output": 153459,
+            "total": 280555
+          },
+          "parse_strategies": {
+            "strict_int": {
+              "calls": 100,
+              "pct": 69.4
+            },
+            "last_line_int": {
+              "calls": 35,
+              "pct": 24.3
+            },
+            "first_int_anywhere": {
+              "calls": 9,
+              "pct": 6.2
+            }
+          }
+        }
+      ]
     }
   ]
 }
